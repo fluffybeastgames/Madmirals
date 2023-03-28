@@ -1,12 +1,19 @@
 # ### MADMIRALS!!!
 
+
+# game of life as opponent entity(ies) - can adjust win/lose conditions around ability to influence the preexisting algo
+# spinoff idea: petri wars: spend points to decide numner of starting cells and their respective locations and traits.. then it plays out like conway's game of lie, except maybe w/ ability to place powerups to influence gameplay!
 import random
 import tkinter as tk 
 from tkinter import messagebox
 import time
 from functools import partial
 import math
-
+import json
+import opensimplex
+import numpy as np
+from PIL import Image
+import matplotlib.pyplot as plt
 
 DIR_UP = 1 
 DIR_DOWN = 2
@@ -16,12 +23,14 @@ DIR_RIGHT = 4
 class MadmiralsGameManager:
     GAME_TURN_SPEED = .5 # in s
     CYCLE_SPEED = 100 # ms between checks of game loop
+    DEFAULT_ROWS = 9
+    DEFAULT_COLS = 16
 
     def __init__(self):
         num_players = 5
 
         self.gui = self.MadmiralsGUI(self)
-        self.game = self.MadmiralsGameInstance(self, num_rows=8, num_cols=12, game_mode='normal', num_players=num_players)
+        self.game = self.MadmiralsGameInstance(self, num_rows=self.DEFAULT_ROWS, num_cols=self.DEFAULT_COLS, game_mode='normal', num_players=num_players)
         
         self.gui.populate_cell_frame()
         self.gui.populate_scoreboard_frame()
@@ -64,8 +73,8 @@ class MadmiralsGameManager:
             self.root.title('Madmirals')
             self.root.config(menu=self.create_menu_bar(self.root))
             self.parent = parent
-            self.assets = self.GUI_Assets(r'C:\Users\thema\Documents\Python Scripts\generally\assets\\') # TODO TEMP! 
-            self.fog_of_war_enabled= False # or True
+            self.assets = self.GUI_Assets(r'C:\Users\thema\Documents\Python Scripts\Madmirals\assets\\') # TODO TEMP! 
+            self.fog_of_war= False # or True
             
             self.frame_game_board = tk.Frame(master=self.root)
             self.frame_scoreboard = tk.Frame(master=self.root)
@@ -170,8 +179,7 @@ class MadmiralsGameManager:
             filemenu.add_command(label='Exit', command=self.root.quit)
             
             game_menu = tk.Menu(menubar, tearoff=0)
-            game_menu.add_command(label='Settings', command=partial(self.open_game_settings_window, root))
-            game_menu.add_command(label='Help', command=partial(self.open_help_window, root))
+            game_menu.add_command(label='Toggle Fog of War', command=self.toggle_fog_of_war)
             game_menu.add_command(label='Toggle Debug Mode', command=self.toggle_debug_menu)
             
             menubar.add_cascade(label='File', menu=filemenu)
@@ -182,20 +190,11 @@ class MadmiralsGameManager:
         def restart_game(self):
             print('TODO Restart game ')
 
+        def toggle_fog_of_war(self):
+            self.fog_of_war = not self.fog_of_war
 
         def toggle_debug_menu(self):
             self.parent.debug_mode = not self.parent.debug_mode
-
-
-        def open_game_settings_window(self, root):
-            self.SettingsWindow(self) #maybe not best practice - creates a top level window that will destroy itself upon closure (but we can't refer to it or see if one is already open)
-
-
-        def open_help_window(self, root):
-            top= tk.Toplevel(root)
-            top.geometry('500x250')
-            top.title('Help')
-            tk.Label(top, text= 'Here\'s how to play Madmirals', font=('Helvetica 14 bold')).place(x=150,y=80)
 
         
         def open_about_window(self, root):
@@ -309,12 +308,12 @@ class MadmiralsGameManager:
                     relief = tk.RAISED if self.parent.game.active_cell == (i,j) else tk.SUNKEN
                     cell_type = self.parent.game.game_board[(i,j)].cell_type
 
-                    if self.fog_of_war_enabled and not self.cell_should_be_visible(i, j, player_id=0):
+                    if self.fog_of_war and not self.cell_should_be_visible(i, j, player_id=0):
                         bg_color = 'black'
                         fg_color = 'black'
                     else:
-                        bg_color = self.parent.game.GamePlayer.colors[uid][0]
-                        fg_color = self.parent.game.GamePlayer.colors[uid][1]
+                        bg_color = self.parent.game.GameEntity.colors[uid][0]
+                        fg_color = self.parent.game.GameEntity.colors[uid][1]
                    
 
                     #font = ('Arial 18 bold') if cell_type == self.parent.game.MadCell.CELL_TYPE_MOUNTAIN else ('Arial 14')  # ooh this was a fun experiment - mountains stand out more, and clusters of non-mountains look like meadows..
@@ -353,8 +352,8 @@ class MadmiralsGameManager:
                 dict_troops[uid] = players[i].get_troop_count()
 
                 if players[i].active:
-                    bg = self.parent.game.GamePlayer.colors[uid][0]
-                    fg = self.parent.game.GamePlayer.colors[uid][1]
+                    bg = self.parent.game.GameEntity.colors[uid][0]
+                    fg = self.parent.game.GameEntity.colors[uid][1]
                 else:
                     bg = 'light grey'
                     fg = 'dark grey'
@@ -373,7 +372,7 @@ class MadmiralsGameManager:
 
 
         def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
-            # print('render_game_over')
+            print('render_game_over')
             pass
 
 
@@ -407,18 +406,18 @@ class MadmiralsGameManager:
             self.turn_order = [] # the initial order of turns.. can be eg shuffled between turns, or assign priority keys and flip flop between whether or high or low has priority
             
             for i in range(num_players):
-                bg = self.GamePlayer.colors[i][0]
-                fg = self.GamePlayer.colors[i][1]
+                bg = self.GameEntity.colors[i][0]
+                fg = self.GameEntity.colors[i][1]
 
                 player_id = i
 
                 bot_behavior = None
-                if i == 1: bot_behavior = self.GamePlayer.BEHAVIOR_PETRI
-                #if i == 2: bot_behavior = self.GamePlayer.BEHAVIOR_AMBUSH_PREDATOR
-                if i == 2: bot_behavior = self.GamePlayer.BEHAVIOR_PETRI
-                if i == 3: bot_behavior = self.GamePlayer.BEHAVIOR_PETRI
+                if i == 1: bot_behavior = self.GameEntity.BEHAVIOR_PETRI
+                if i == 2: bot_behavior = self.GameEntity.BEHAVIOR_PETRI
+                if i == 3: bot_behavior = self.GameEntity.BEHAVIOR_PETRI
+                if i == 4: bot_behavior = self.GameEntity.BEHAVIOR_AMBUSH_PREDATOR
 
-                self.players[i] = self.GamePlayer(self, player_id, f'Player {i}', bg, fg, bot_behavior)
+                self.players[i] = self.GameEntity(self, player_id, f'Player {i}', bg, fg, bot_behavior)
                 self.turn_order.append(player_id)
         
             self.game_board = {}
@@ -430,14 +429,131 @@ class MadmiralsGameManager:
 
 
             self.seed = str(random.random())
-            # self.seed = str(0.3355275013608682)
+            # self.seed = str(0.7625310337113341)
+            # self.seed = str(0.1234567890123456)
+            # self.seed = str(0.7845326548911178)
+            # self.seed = str(0.1112223334455666)
+            # self.seed = str(0.9999999999999999)
+
 
             self.generate_game_world()
 
 
+        def closest_instance_of_entity(self, entity_type, starting_cell):
+            MAX_SEARCH_DEPTH = 3  # temp, should line up w/ user input
+
+
+            class SearchQueue:
+                def __init__(self):
+                    self.queue = [] # an ordered list of SearchQueueItem cells to check, facilitating a breadth first approach to checking
+                    self.addresses_already_searched = []
+                    self.addresses_pending_search = []
+
+                def pop_next_search_item(self):
+                    if len(self.queue) > 0:
+                        return self.queue.pop(0)
+                    else:
+                        return None
+                    
+                class SearchQueueItem:
+                    def __init__(self, target_cell, distance, continue_left=True, continue_up=True, continue_down=True, continue_right=True):
+                        self.target_cell = target_cell
+                        self.distance = distance
+                        self.continue_left = continue_left
+                        self.continue_up = continue_up
+                        self.continue_down = continue_down
+                        self.continue_right = continue_right
+
+                # def add_to_queue(self, target_cell, continue_left=False, continue_up=False, continue_down=False, continue_right=False):
+                #     item = self.SearchQueueItem()
+                #     self.queue.append()
+            
+            # target_cell.CELL_TYPE_BLANK = 0
+            # CELL_TYPE_ADMIRAL = 1
+            # CELL_TYPE_MOUNTAIN = 2
+            # CELL_TYPE_CITY = 3
+            # CELL_TYPE_SWAMP = 4
+                
+            
+            search_queue = SearchQueue()
+            search_queue.queue.append(search_queue.SearchQueueItem(starting_cell, distance=0))
+            #print(search_queue.queue[0].target_cell)
+
+            entity_found = False
+            distance = 0
+
+            print(f'Starting... first cell is ({search_queue.queue[0].target_cell.row}, {search_queue.queue[0].target_cell.col})')
+            
+
+            while(len(search_queue.addresses_already_searched) < self.num_rows*self.num_cols and not entity_found and distance <= MAX_SEARCH_DEPTH):
+                s_item = search_queue.pop_next_search_item()
+                
+                if s_item is not None:
+                    # print(f''target cell{s_item.target_cell}')
+                    row = s_item.target_cell.row
+                    col = s_item.target_cell.col
+                    
+                    if (row, col) not in search_queue.addresses_already_searched:
+                        search_queue.addresses_already_searched.append((row, col))
+                        print(f'Checking \t{(row, col)}\t attempt {len(search_queue.addresses_already_searched)}\tDistance {s_item.distance}')    
+                        
+                        if s_item.target_cell.cell_type == entity_type:
+                            entity_found = True
+                            distance = s_item.distance
+                        
+                        else:
+                            if s_item.continue_left: # if this check looks left
+                                if col > 0: # if left is in bounds
+                                    new_address = (row, col-1)
+                                    if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
+                                        search_queue.addresses_pending_search.append(new_address)
+                                        new_cell = self.game_board[new_address]
+                                        search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
+                            
+                            if s_item.continue_up: # if this check looks up
+                                if row > 0:  # if move is in bounds
+                                    new_address = (row-1, col)
+                                    if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
+                                        search_queue.addresses_pending_search.append(new_address)
+                                        new_cell = self.game_board[new_address]
+                                        search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
+                                
+                            
+                            if s_item.continue_right: 
+                                if col < (self.num_cols-1): # if move is in bounds
+                                    new_address = (row, col+1)
+                                    if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
+                                        search_queue.addresses_pending_search.append(new_address)
+                                        new_cell = self.game_board[new_address]
+                                        search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
+                            
+                            if s_item.continue_down: 
+                                if row < (self.num_rows-1): # if move is in bounds
+                                    new_address = (row+1, col)
+                                    if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
+                                        search_queue.addresses_pending_search.append(new_address)
+                                        new_cell = self.game_board[new_address]
+                                        search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
+                            
+                            
+                        # if x: entity_found = True
+                        # else: add queue items to valid targets in valid continue_ directions
+                        # TODO here almost on the verge of greatness, or at least adequacy..
+                    
+                    else:
+                        print(f'Already checked ({s_item.target_cell.row}, {s_item.target_cell.col})')
+
+                else:
+                    print('I think reaching this means at least one cell is blocked by eg mountains')
+                    distance = -1
+
+            print(f'Escaped with a result of {distance}\t{s_item.target_cell.row}, {s_item.target_cell.col}')
+            return distance
+        
+
         def generate_game_world(self):
             print(f'Board size: {self.num_rows}x{self.num_cols}\tNum Players{self.num_players}\tSeed: {self.seed}\t')
-                 
+                
             def get_digit(number, digit):
             # Returns one of the 16 digits of the seed. I
                 
@@ -446,27 +562,38 @@ class MadmiralsGameManager:
 
                 return int(str_num[digit % len(str_num)]) # by using modulus we don't need to implement a max digit
                 # TODO test what happens w negative numbers and make sure it never gets given invalid input
-                
-                
+            
+
+            MIN_DISTANCE_BETWEEN_ADMIRALS = 4
+
             # Add spawns
+            spawn_points_added = 0 
             for p in range(self.num_players):
                 spawn_found = False 
                 digit = 0
                 while(not spawn_found):
-                    p_row_target = (get_digit(self.seed, digit+p) * get_digit(self.seed, digit+p+1)) % self.num_rows
-                    p_col_target = (get_digit(self.seed, digit+p+2) * get_digit(self.seed, digit+p+3)) % self.num_cols
+                    p_row_target = (get_digit(self.seed, digit+p-1) * get_digit(self.seed, digit+p+1)) % self.num_rows
+                    p_col_target = (get_digit(self.seed, digit+p*2) * get_digit(self.seed, digit+p+3)) % self.num_cols
                     # print(f'{p_row_target}x{p_col_target}')
                     
                     target_cell = self.game_board[(p_row_target, p_col_target)]
 
                     if target_cell.owner == None:
-                        target_cell.owner = self.players[p].user_id
-                        target_cell.cell_type = target_cell.CELL_TYPE_ADMIRAL
-                        target_cell.troops = 1
+                        if spawn_points_added == 0 or (self.closest_instance_of_entity(target_cell.CELL_TYPE_ADMIRAL, target_cell) >= MIN_DISTANCE_BETWEEN_ADMIRALS):
+                            target_cell.owner = self.players[p].user_id
+                            target_cell.cell_type = target_cell.CELL_TYPE_ADMIRAL
+                            target_cell.troops = 1
+                            spawn_points_added +=1
+                            
+                            spawn_found = True
+                            print(f'added admiral to cell ({target_cell.row}, {target_cell.col})')
                         
-                        spawn_found = True
+                        else:
+                            print('still looking for a spot')
+
                     else:
                         digit += 1  
+                        print('b')
 
             MOUNTAIN_SPAWN_RATE = .09
             CITY_SPAWN_RATE = .05
@@ -622,7 +749,7 @@ class MadmiralsGameManager:
             #print(self.players[0].player_queue.print_queue())
             
 
-        class GamePlayer:
+        class GameEntity:
             colors = { # by player id - tuples of (bg color, fg color)
                 None: ('light grey', 'black'),
                 0: ('dark green', 'white'),
@@ -645,6 +772,7 @@ class MadmiralsGameManager:
                 self.color_bg = color_bg
                 self.color_fg = color_fg
                 self.active = True # set to False upon defeat
+                #self.is_a_player = False # does this entity belong to the player? if so player will be defeated when all such entities are deactivated
                 
                 self.player_queue = self.ActionQueue(self)
 
@@ -717,7 +845,8 @@ class MadmiralsGameManager:
                 
 
             def run_ambush_behavior_check(self):
-                print(f'run_ambush_behavior_check for: {self.user_desc}')
+                pass 
+                # print(f'run_ambush_behavior_check for: {self.user_desc}')
                 
 
             def run_petri_growth_check(self):
@@ -774,13 +903,16 @@ class MadmiralsGameManager:
             #print(f'Action pending: {next_action.source_address} \t{next_action.action} \t{next_action.direction}')
 
         def end_game_check(self):
-            print('end_game_check')
+            #print('end_game_check')
+            num_active = 0
 
-            # if game won
-            # 
-            # elif game lost
-
-            return False
+            for i in range(self.num_players):
+                if self.players[i].active:
+                    num_active += 1 
+            
+            # print(f'num active {num_active}')
+            # return False
+            return num_active <= 1
             #tkinter.messagebox.askokcancel(title=None, message=None, **options)
         
         
@@ -789,6 +921,7 @@ class MadmiralsGameManager:
 
             if self.end_game_check():
                 tk.messagebox.askokcancel(title='GG', message='gg')
+                self.game_status = self.GAME_STATUS_GAME_OVER
 
             ### Cycle through the players in turn_order[]. If the player's queue is not empty, pop the first element and attempt to perform it
             # Invalid moves: 
@@ -811,7 +944,7 @@ class MadmiralsGameManager:
                             troops_to_move = math.trunc(starting_troops/2) # round down w/ truncate to make sure we never move our last troop
 
                         elif next_action.action == self.ACTION_MOVE_ALL:
-                            print(f'cell type {self.game_board[next_action.source_address].cell_type} / in ({self.MadCell.CELL_TYPE_ADMIRAL} {self.MadCell.CELL_TYPE_CITY}) ')
+                            # print(f'cell type {self.game_board[next_action.source_address].cell_type} / in ({self.MadCell.CELL_TYPE_ADMIRAL} {self.MadCell.CELL_TYPE_CITY}) ')
                             if self.game_board[next_action.source_address].cell_type in (self.MadCell.CELL_TYPE_ADMIRAL, ): #, self.MadCell.CELL_TYPE_CITY):
                                 troops_to_move = starting_troops - 1
                             else:
@@ -857,10 +990,10 @@ class MadmiralsGameManager:
             ### Bot behavior phase
             for i in range(len(self.turn_order)):
                 behavior = self.players[self.turn_order[i]].bot_behavior
-                if behavior == self.GamePlayer.BEHAVIOR_AMBUSH_PREDATOR:
+                if behavior == self.GameEntity.BEHAVIOR_AMBUSH_PREDATOR:
                     self.players[self.turn_order[i]].run_ambush_behavior_check() 
                 
-                if behavior == self.GamePlayer.BEHAVIOR_PETRI:
+                if behavior == self.GameEntity.BEHAVIOR_PETRI:
                     self.players[self.turn_order[i]].run_petri_growth_check() 
                     
                     
@@ -876,10 +1009,10 @@ class MadmiralsGameManager:
                     cell_type = self.game_board[(i,j)].cell_type
                     owner = self.game_board[(i,j)].owner
                     
-                    ADMIRAL_GROW_RATE = 1
-                    CITY_GROW_RATE = 5
+                    ADMIRAL_GROW_RATE = 2
+                    CITY_GROW_RATE = 4
                     BLANK_GROW_RATE = 25
-                    SWAMP_DRAIN_RATE = 2
+                    SWAMP_DRAIN_RATE = 4
 
                     if owner is not None:
 
