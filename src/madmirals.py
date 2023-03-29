@@ -5,7 +5,9 @@
 # spinoff idea: petri wars: spend points to decide numner of starting cells and their respective locations and traits.. then it plays out like conway's game of lie, except maybe w/ ability to place powerups to influence gameplay!
 import random
 import tkinter as tk 
+from tkinter import * 
 from tkinter import messagebox
+from tkinter import ttk
 import time
 from functools import partial
 import math
@@ -23,20 +25,16 @@ DIR_RIGHT = 4
 class MadmiralsGameManager:
     GAME_TURN_SPEED = .5 # in s
     CYCLE_SPEED = 100 # ms between checks of game loop
-    DEFAULT_ROWS = 9
-    DEFAULT_COLS = 16
+    DEFAULT_ROWS = None # 9 - if None, then the world generation will pick one pseudo-randomly
+    DEFAULT_COLS = None # 16 - if None, then the world generation will pick one pseudo-randomly
 
     def __init__(self):
-        num_players = 5
-
         self.gui = self.MadmiralsGUI(self)
-        self.game = self.MadmiralsGameInstance(self, num_rows=self.DEFAULT_ROWS, num_cols=self.DEFAULT_COLS, game_mode='normal', num_players=num_players)
+        self.game = self.MadmiralsGameInstance(self)
         
-        self.gui.populate_cell_frame()
+        self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
         self.gui.populate_win_conditions_frame()
-        
-         
         
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
@@ -44,6 +42,39 @@ class MadmiralsGameManager:
         self.game.game_status = self.game.GAME_STATUS_IN_PROGRESS
 
         self.game_loop() # start the game cycle!
+    
+
+    def start_or_restart_game(self, num_rows=None, num_cols=None, num_players=None, seed=None):
+        print('start_or_restart_game')
+
+        self.game = self.MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode='normal', num_players=num_players)
+        
+        # #self.gui.frame_game_board.destroy()
+        # self.gui.frame_game_board = self.gui.populate_game_board_frame()
+
+        # #self.gui.frame_scoreboard.destroy()
+        # self.gui.frame_scoreboard = self.gui.populate_scoreboard_frame()
+        
+        # #self.gui.frame_win_conditions.destroy()
+        # self.gui.frame_win_conditions = self.gui.populate_win_conditions_frame()
+        
+        self.gui.populate_game_board_frame()
+        self.gui.populate_scoreboard_frame()
+        self.gui.populate_win_conditions_frame()
+        # TODO also do the canvas!
+        
+        self.game_cell_Buttons = {}
+        
+        self.last_turn_timestamp = time.time()
+        self.after_id = None # for repeating the game loop
+
+        self.game.game_status = self.game.GAME_STATUS_IN_PROGRESS
+
+        self.game_loop() # start the game cycle!
+
+
+
+
 
     def game_loop(self):
         # print('game loop')
@@ -74,12 +105,16 @@ class MadmiralsGameManager:
             self.root.config(menu=self.create_menu_bar(self.root))
             self.parent = parent
             self.assets = self.GUI_Assets(r'C:\Users\thema\Documents\Python Scripts\Madmirals\assets\\') # TODO TEMP! 
-            self.fog_of_war= False # or True
-            
+        
             self.frame_game_board = tk.Frame(master=self.root)
             self.frame_scoreboard = tk.Frame(master=self.root)
             self.frame_win_conditions = tk.Frame(master=self.root)
-            
+            # self.h_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.HORIZONTAL)
+            # self.v_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.VERTICAL)
+            self.canvas = Canvas(self.frame_scoreboard)
+
+
+
             self.game_cell_Buttons = {}
 
         class GUI_Assets: 
@@ -188,10 +223,19 @@ class MadmiralsGameManager:
             return menubar
         
         def restart_game(self):
-            print('TODO Restart game ')
+            print('TODO Restart game')
+
+            # Use all random values for now!
+            num_rows = None
+            num_cols = None
+            num_players = None
+            seed = None 
+
+            self.parent.start_or_restart_game(num_rows, num_cols, num_players, seed)
+            
 
         def toggle_fog_of_war(self):
-            self.fog_of_war = not self.fog_of_war
+            self.parent.game.fog_of_war = not self.parent.game.fog_of_war
 
         def toggle_debug_menu(self):
             self.parent.debug_mode = not self.parent.debug_mode
@@ -203,17 +247,32 @@ class MadmiralsGameManager:
             top.title('About Madmirals')
             tk.Label(top, text= 'All About Madmirals', font=('Helvetica 14 bold')).place(x=150,y=80)
 
-    
-        def populate_cell_frame(self):
-            self.frame_game_board.destroy()
+        def populate_game_board_frame(self):
+            if not self.frame_game_board is None: self.frame_game_board.destroy()
+            if not self.canvas is None: self.canvas.destroy()
+            
             self.frame_game_board = tk.Frame(master=self.root)
+        
+            self.h_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.HORIZONTAL)
+            self.v_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.VERTICAL)
+            self.canvas = Canvas(self.frame_game_board, scrollregion=(0, 0, 600, 600), yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
+            self.h_bar['command'] = self.canvas.xview
+            self.v_bar['command'] = self.canvas.yview
+
+            self.canvas.grid(column=0, row=0, sticky=(N,W,E,S))
+            self.h_bar.grid(column=0, row=1, sticky=(W,E))
+            self.v_bar.grid(column=1, row=0, sticky=(N,S))
+            self.frame_game_board.grid_columnconfigure(0, weight=1)
+            self.frame_game_board.grid_rowconfigure(0, weight=1)
+
+            self.frame_buttons = tk.Frame(master=self.canvas)
             
             self.board_cell_buttons = {}
 
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
                     #self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_game_board, bg='light grey', textvariable=self.parent.game.game_board[(i,j)].display_text, width=8, height=4) # add cell to the dictionary and establish default behavior
-                    self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_game_board, 
+                    self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_buttons, 
                         textvariable=self.parent.game.game_board[(i,j)].display_text, 
                         width=6, height=3,
                         highlightcolor='orange'                        
@@ -225,12 +284,22 @@ class MadmiralsGameManager:
                     self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
 
             self.root.bind('<Key>', self.key_press_handler)
+            
+            self.frame_buttons.grid(row=0, column=0)
+            
+            #self.canvas.create_window((0,0), width=5000, height=500, window=self.frame_buttons, anchor=tk.NW)
+
+            #self.frame_buttons.update_idletasks()
+
             self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=5)
+            #self.frame_game_board.grid(row=0, column=0, pady=5)
             self.frame_game_board.focus_set()
 
         def populate_win_conditions_frame(self):
             print('populate_win_conditions_frame')
-            self.frame_win_conditions.destroy()
+            if not self.frame_win_conditions is None:
+                self.frame_win_conditions.destroy()
+
             self.frame_win_conditions = tk.Frame(master=self.root)
 
             self.lbl_win_header = tk.Label(master=self.frame_win_conditions, text='Win Conditions', font=('Arial 22 bold'))
@@ -239,20 +308,16 @@ class MadmiralsGameManager:
             self.lbl_lose_header = tk.Label(master=self.frame_win_conditions, text='Lose Conditions', font=('Arial 22 bold'))
             self.lbl_lose_desc = tk.Label(master=self.frame_win_conditions, text='Troop count reaches 0', font=('Arial 18 bold'))
             
-
             self.lbl_win_header.grid(row=0, column=0)
             self.lbl_win_desc.grid(row = 1, column = 0)
             self.lbl_lose_header.grid(row=2, column=0)
             self.lbl_lose_desc.grid(row = 3, column = 0)
-
-
-
-
             self.frame_win_conditions.grid(row=1, column=9, sticky='n')
 
 
         def populate_scoreboard_frame(self):
-            self.frame_scoreboard.destroy()
+            if not self.frame_scoreboard is None:
+                self.frame_scoreboard.destroy()
             self.frame_scoreboard = tk.Frame(master=self.root)
 
             self.lbl_header = tk.Label(master=self.frame_scoreboard, text='Scoreboard', font=('Arial 22 bold'))
@@ -268,53 +333,51 @@ class MadmiralsGameManager:
 
             ROW_OFFSET = 2
             for i in range(self.parent.game.num_players):
-                self.lbls_name.append(tk.Label(master=self.frame_scoreboard, text=f'player {i}'))
-                self.lbls_cells.append(tk.Label(master=self.frame_scoreboard, text=f'cells {i}'))
-                self.lbls_troops.append(tk.Label(master=self.frame_scoreboard, text=f'troops {i}'))
+                self.lbls_name.append(tk.Label(master=self.frame_scoreboard, text=f'player {i}',  font=('Arial 16 bold')))
+                self.lbls_cells.append(tk.Label(master=self.frame_scoreboard, text=f'cells {i}',  font=('Arial 16 bold')))
+                self.lbls_troops.append(tk.Label(master=self.frame_scoreboard, text=f'troops {i}',  font=('Arial 16 bold')))
 
-                self.lbls_name[i].grid(row = i + ROW_OFFSET, column = 0)
-                self.lbls_cells[i].grid(row = i + ROW_OFFSET, column = 1)
-                self.lbls_troops[i].grid(row = i + ROW_OFFSET, column = 2)
+                self.lbls_name[i].grid(row=i + ROW_OFFSET, column=0, sticky=W)
+                self.lbls_cells[i].grid(row=i + ROW_OFFSET, column=1, sticky=E)
+                self.lbls_troops[i].grid(row=i + ROW_OFFSET, column=2, sticky=E)
 
             self.frame_scoreboard.grid(row=0, column=9, sticky='n')
         
-
-        def cell_should_be_visible(self, row, col, player_id):
-            if self.parent.game.game_board[(row, col)].owner == player_id:
-                return True
-            elif (
-                (row>0 and self.parent.game.game_board[(row-1, col)].owner == player_id) or  # top
-                (row>0 and col>0 and self.parent.game.game_board[(row-1, col-1)].owner == player_id) or # top left
-                (row>0 and col<(self.parent.game.num_cols-1) and self.parent.game.game_board[(row-1, col+1)].owner == player_id) or # top right
-                
-                (col>0 and self.parent.game.game_board[(row, col-1)].owner == player_id) or # left
-                (col<(self.parent.game.num_cols-1) and self.parent.game.game_board[(row, col+1)].owner == player_id) or # right
-
-                (row<(self.parent.game.num_rows-1) and col>0 and self.parent.game.game_board[(row+1, col-1)].owner == player_id) or # bot left
-                (row<(self.parent.game.num_rows-1) and self.parent.game.game_board[(row+1, col)].owner == player_id) or # bot
-                (row<(self.parent.game.num_rows-1) and col<(self.parent.game.num_cols-1) and self.parent.game.game_board[(row+1, col+1)].owner == player_id)# bot right
-                ):
-                    return True
-                
-            else:
-                return False
-            
-
         def render(self):            
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
-                    uid = self.parent.game.game_board[(i,j)].owner
+
+                    cell = self.parent.game.game_board[(i,j)]
+                    ###print(f'address | owner:\t{(i,j)}\t{cell.owner      }')
+                    uid = cell.owner
 
                     relief = tk.RAISED if self.parent.game.active_cell == (i,j) else tk.SUNKEN
-                    cell_type = self.parent.game.game_board[(i,j)].cell_type
-
-                    if self.fog_of_war and not self.cell_should_be_visible(i, j, player_id=0):
+                    cell_type = cell.cell_type
+                                       
+                    if self.parent.game.fog_of_war and cell.hidden:
                         bg_color = 'black'
-                        fg_color = 'black'
+                        fg_color = 'grey'
                     else:
-                        bg_color = self.parent.game.GameEntity.colors[uid][0]
-                        fg_color = self.parent.game.GameEntity.colors[uid][1]
-                   
+                        
+                        if uid is None:
+                            if cell_type in [cell.CELL_TYPE_MOUNTAIN, cell.CELL_TYPE_MOUNTAIN_CRACKED]:
+                                bg_color = 'dark grey'
+                                fg_color = 'black'
+                            elif cell_type == cell.CELL_TYPE_SWAMP:
+                                bg_color = 'dark green'
+                                fg_color = 'dark grey'
+                            else:
+                                bg_color = 'light blue'
+                                fg_color = 'dark grey'
+
+                        else:
+                            bg_color = self.parent.game.players[uid].color_bg
+                            fg_color = self.parent.game.players[uid].color_fg
+                            
+                            # bg_color = self.parent.game.GameEntity.player_colors[uid][0]
+                            # fg_color = self.parent.game.GameEntity.player_colors[uid][1]
+
+                    
 
                     #font = ('Arial 18 bold') if cell_type == self.parent.game.MadCell.CELL_TYPE_MOUNTAIN else ('Arial 14')  # ooh this was a fun experiment - mountains stand out more, and clusters of non-mountains look like meadows..
                     font = ('Arial 16 bold')
@@ -331,6 +394,12 @@ class MadmiralsGameManager:
             
             self.update_score_board()
 
+            # print('todo - if debug mode, show extra frame and update text, otherwise keep it hidden')
+            #             if self.parent.debug_mode: 
+            #     self.debug_label_text.set(self.get_performance_stats())
+            # else:
+            #     self.debug_label_text.set('')
+
 
         def update_score_board(self):
             ##print('updating scoreboard')
@@ -345,6 +414,8 @@ class MadmiralsGameManager:
             
             self.lbl_turn_count.configure(text=f'Turn {self.parent.game.turn}')
 
+
+
             for i in range(self.parent.game.num_players):
                 uid = players[i].user_id
                 dict_names[uid] = players[i].user_desc
@@ -352,13 +423,12 @@ class MadmiralsGameManager:
                 dict_troops[uid] = players[i].get_troop_count()
 
                 if players[i].active:
-                    bg = self.parent.game.GameEntity.colors[uid][0]
-                    fg = self.parent.game.GameEntity.colors[uid][1]
+                    bg = self.parent.game.players[uid].color_bg
+                    fg = self.parent.game.players[uid].color_fg
                 else:
                     bg = 'light grey'
                     fg = 'dark grey'
 
-                #self.players[victim].active = False
 
                 # TODO determine sort order            
                 self.lbls_name[i].configure(text=dict_names[uid], bg=bg, fg=fg)
@@ -372,7 +442,7 @@ class MadmiralsGameManager:
 
 
         def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
-            print('render_game_over')
+            #print('render_game_over')
             pass
 
 
@@ -390,14 +460,16 @@ class MadmiralsGameManager:
         ACTION_CHARGE = 777 # idea: start a chain of move_normals that extends to the edge of the board (or until it hits a barrier)
                 
 
-        def __init__(self, parent, num_rows, num_cols, game_mode, num_players):
+        def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None):
             self.parent = parent
+            self.seed = seed
+            self.fog_of_war = True
             
             self.game_status = self.GAME_STATUS_INIT
             self.turn = 0
 
-            self.num_rows = num_rows
-            self.num_cols = num_cols
+            self.num_rows = num_rows # either a predefined integer value (preferably higher than 5) or None. 
+            self.num_cols = num_cols #      If it's None, a pseudo-random value will be assigned in 
             self.num_players = num_players
 
             self.active_cell = None # cell address 
@@ -405,37 +477,8 @@ class MadmiralsGameManager:
             self.players = {} # contains the player objects w/ numeric id
             self.turn_order = [] # the initial order of turns.. can be eg shuffled between turns, or assign priority keys and flip flop between whether or high or low has priority
             
-            for i in range(num_players):
-                bg = self.GameEntity.colors[i][0]
-                fg = self.GameEntity.colors[i][1]
-
-                player_id = i
-
-                bot_behavior = None
-                if i == 1: bot_behavior = self.GameEntity.BEHAVIOR_PETRI
-                if i == 2: bot_behavior = self.GameEntity.BEHAVIOR_PETRI
-                if i == 3: bot_behavior = self.GameEntity.BEHAVIOR_PETRI
-                if i == 4: bot_behavior = self.GameEntity.BEHAVIOR_AMBUSH_PREDATOR
-
-                self.players[i] = self.GameEntity(self, player_id, f'Player {i}', bg, fg, bot_behavior)
-                self.turn_order.append(player_id)
-        
             self.game_board = {}
-            for i in range(self.num_rows):
-                for j in range(self.num_cols):
-                    self.game_board[(i, j)] = self.MadCell(self, i, j)
-
-            # self.add_dev_starting_condition()
-
-
-            self.seed = str(random.random())
-            # self.seed = str(0.7625310337113341)
-            # self.seed = str(0.1234567890123456)
-            # self.seed = str(0.7845326548911178)
-            # self.seed = str(0.1112223334455666)
-            # self.seed = str(0.9999999999999999)
-
-
+            
             self.generate_game_world()
 
 
@@ -468,12 +511,6 @@ class MadmiralsGameManager:
                 #     item = self.SearchQueueItem()
                 #     self.queue.append()
             
-            # target_cell.CELL_TYPE_BLANK = 0
-            # CELL_TYPE_ADMIRAL = 1
-            # CELL_TYPE_MOUNTAIN = 2
-            # CELL_TYPE_CITY = 3
-            # CELL_TYPE_SWAMP = 4
-                
             
             search_queue = SearchQueue()
             search_queue.queue.append(search_queue.SearchQueueItem(starting_cell, distance=0))
@@ -552,8 +589,118 @@ class MadmiralsGameManager:
         
 
         def generate_game_world(self):
-            print(f'Board size: {self.num_rows}x{self.num_cols}\tNum Players{self.num_players}\tSeed: {self.seed}\t')
+            if self.seed is None:
+                ####self.seed = 33 # TODO temp
+                self.seed = random.randint(0, 10**10)
+
+            print(f'Generating world with seed {self.seed}')
+
+            opensimplex.seed(self.seed)
+        
+            if self.num_players is None:
+                self.num_players = min(3 + abs(int(opensimplex.noise2(0.5, 0.5)*12)), 8)
+
+                print(f'Num players: {self.num_players}')
+
+            list_avail_names = self.GameEntity.get_available_bot_names()
+            list_avail_colors = self.GameEntity.get_available_player_colors()
+        
+            for i in range(self.num_players):
+                user_desc = list_avail_names.pop(self.seed*123 % len(list_avail_names))
+                user_colors = list_avail_colors.pop(self.seed*33 % len(list_avail_colors))
                 
+
+                bg = user_colors[0]
+                fg = user_colors[1]
+
+                player_id = i
+
+                bot_behavior = None
+                if i > 0:    
+                    if i % 4 == 0:
+                        bot_behavior = self.GameEntity.BEHAVIOR_AMBUSH_PREDATOR
+                    else:
+                        bot_behavior = self.GameEntity.BEHAVIOR_PETRI
+
+                self.players[i] = self.GameEntity(self, player_id, user_desc, bg, fg, bot_behavior)
+                self.turn_order.append(player_id)
+        
+            if self.num_rows is None:
+                self.num_rows = 7 + abs(int(opensimplex.noise2(0.5, 0.5)*10))
+                
+            if self.num_cols is None:
+                self.num_cols = 10 + abs(int(opensimplex.noise2(0.5, 0.5)*5))
+
+            print(f'Rows: {self.num_rows}\tCols: {self.num_cols}\tPlayers{self.num_players}\tSeed{self.seed}')
+            
+            num_params = 2 # item id; include item or not; how many of item (eg starting 'troops' on idle cities and strength of mtns)
+
+            rng_x = np.arange(self.num_rows)
+            rng_y = np.arange(self.num_cols)
+            rng_z = np.arange(num_params)
+            result = opensimplex.noise3array(rng_z, rng_y, rng_x)
+
+
+            for i in range(self.num_rows):
+                for j in range(self.num_cols):
+                    self.game_board[(i, j)] = self.MadCell(self, i, j)
+
+
+            for i in range(self.num_rows):
+                for j in range(self.num_cols):
+                    target_cell = self.game_board[(i, j)]
+                    item_id = result[i][j][0]
+                    item_amt = result[i][j][1]
+                    
+                    if item_id < -.5:
+                        target_cell.cell_type = target_cell.CELL_TYPE_MOUNTAIN
+                        target_cell.troops = int(abs(item_amt)*50)
+                        
+
+                    elif item_id < -.25:
+                        target_cell.cell_type = target_cell.CELL_TYPE_CITY
+                        target_cell.troops = 35 + int(abs(item_amt)*20)
+
+                    elif item_id < -.1:
+                        target_cell.cell_type = target_cell.CELL_TYPE_SWAMP
+            
+            
+            spawn_points_added = 0
+            for p in range(self.num_players):
+                target_cell = self.game_board[(p, p+3)]
+                target_cell.owner = self.players[p].user_id
+                target_cell.cell_type = target_cell.CELL_TYPE_ADMIRAL
+                target_cell.troops = 1
+                spawn_points_added +=1
+
+                # dev bonus
+                if p == 0: 
+                    target_cell.troops = 500
+                    self.players[p].user_desc = 'Zeke'
+
+
+            print('test!')
+            
+            # lol fed the function to openAI and forgot to give it a prompt.. it spit out (including the comment char):
+            # if spawn_points_added < self.num_players:
+            #     print(f'WARNING: not enough spawn points added for all players')
+
+            # print(f'game board {self.game_board}')
+            # print(f'game board {self.game_board[(0,3)].cell_type}')
+            # print(f'game board {self.game_board[(0,3)].troops}')
+            # print(f'game board {self.game_board[(1,4)].cell_type}')
+            # print(f'game board {self.game_board[(1,4)].
+
+
+            # And then I asked it:
+            # Explanation of what the code does
+
+            # The code above is a class that generates a game world for a turn-based strategy game. It uses the OpenSimplex library to generate a random seed and then uses that seed to generate a game board with a certain number of rows and columns. It then uses the OpenSimplex library to generate a 3D array of noise values which it uses to determine what type of terrain should be placed in each cell of the game board. It also uses the noise values to determine how many troops should be placed in each cell. Finally, it places a special "Admiral" cell in each corner of the board for each player, which serves as their starting point.
+
+
+        def generate_game_world_old(self):
+            print(f'Board size: {self.num_rows}x{self.num_cols}\tNum Players{self.num_players}\tSeed: {self.seed}\t')
+
             def get_digit(number, digit):
             # Returns one of the 16 digits of the seed. I
                 
@@ -595,59 +742,9 @@ class MadmiralsGameManager:
                         digit += 1  
                         print('b')
 
-            MOUNTAIN_SPAWN_RATE = .09
-            CITY_SPAWN_RATE = .05
-
-                #             col_order = list(range(self.parent.num_cols))
-                # random.shuffle(row_order) # Shuffle the order to improve the randomness of results 
-                # random.shuffle(col_order) # - otherwise there would be noticeable waves pf top left to bottom right moves
-
-                # for i in row_order: 
-                #     for j in col_order:
-
             
-
-
-            #             num_attempts = 0
-            # num_added = 0
-            # if self.parent.debug_mode: attempt_start_time = time.time()
-
-            # while (num_added < num_bombs_to_add):
-            #     num_attempts = num_attempts + 1       
-            #     target_row = rand.randrange(self.num_rows)
-            #     target_col = rand.randrange(self.num_cols)
-                
-            #     if not self.board[(target_row, target_col)].contains_bomb:
-            #         self.board[(target_row, target_col)].contains_bomb = True
-            #         self.num_bombs += 1
-                    # num_added += 1
-
-            # Add cities and mountains
-            for i in range(self.num_rows):
-                for j in range(self.num_cols):
-                    digit_ten = get_digit(self.seed, i)
-                    digit_one = get_digit(self.seed, j)
-                    # digit_ten = get_digit(self.seed, i^2+j^2)
-                    # digit_one = get_digit(self.seed, i*2+j-1)
-
-                    if (digit_ten*10+digit_one)/100 > MOUNTAIN_SPAWN_RATE:
-                        pass
-
-
-                        # print((digit_ten*10+digit_one)/100 )
-                        # print('mountain time')
-                    else:
-                        
-                        pass
-                        #print('nah')
-                    
-                    # if (self.game_board[(i, j)].owner == uid) and (self.game_board[(i, j)].cell_type== self.MadCell.CELL_TYPE_ADMIRAL):
-
-   
-
-            # Add mountains and swamps and neutral cities and other starting conditions
             
-
+            
         def get_admiral_count(self, uid):
             print('get_admiral_count')
             count = 0
@@ -687,80 +784,22 @@ class MadmiralsGameManager:
 
                         self.game_board[(i,j)].troops = math.ceil(self.game_board[(i,j)].troops * TAKEOVER_KEEP_RATE)
 
-
-        def add_dev_starting_condition(self):  
-            print('add_dev_starting_condition')          
-            self.game_board[(0,0)].owner = 0
-            self.game_board[(0,0)].troops = 50
-            
-            self.game_board[(0,5)].owner = 0
-            self.game_board[(0,5)].troops = 40
-            self.game_board[(0,6)].owner = 1
-            self.game_board[(0,6)].troops = 40
-            self.game_board[(0,7)].owner = 2
-            self.game_board[(0,7)].troops = 40
-            self.game_board[(0,8)].owner = 3
-            self.game_board[(0,8)].troops = 40
-
-            self.game_board[(5,1)].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN
-            self.game_board[(5,2)].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN
-            self.game_board[(7,1)].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN
-            self.game_board[(0,3)].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN
-
-            
-            self.game_board[(1,1)].owner = 0
-            self.game_board[(1,1)].cell_type = self.MadCell.CELL_TYPE_ADMIRAL
-
-            self.game_board[(1,2)].owner = 0
-            self.game_board[(1,2)].cell_type = self.MadCell.CELL_TYPE_CITY
-            
-            self.game_board[(2,2)].owner = 0
-            self.game_board[(2,2)].troops = 40
-            
-            self.game_board[(4,2)].owner = 3
-            self.game_board[(4,2)].cell_type = self.MadCell.CELL_TYPE_ADMIRAL
-            
-            self.game_board[(5,2)].owner = 1
-            self.game_board[(5,2)].cell_type = self.MadCell.CELL_TYPE_ADMIRAL
-            
-            self.game_board[(5,5)].owner = 2
-            self.game_board[(5,5)].cell_type = self.MadCell.CELL_TYPE_CITY
-            
-            self.game_board[(5,6)].owner = 2
-            self.game_board[(5,6)].cell_type = self.MadCell.CELL_TYPE_SWAMP
-            self.game_board[(5,6)].troops = 5
-
-            for p in range(4):
-                for moves in range(6):
-                    self.players[p].player_queue.add_action_to_queue((moves, p + 5), self.ACTION_MOVE_NORMAL, DIR_DOWN) 
-            
-            self.players[0].player_queue.add_action_to_queue((0,0), self.ACTION_MOVE_NORMAL, DIR_DOWN) 
-            self.players[0].player_queue.add_action_to_queue((1,0), self.ACTION_MOVE_NORMAL, DIR_DOWN) 
-            self.players[0].player_queue.add_action_to_queue((2,0), self.ACTION_MOVE_NORMAL, DIR_DOWN) 
-            self.players[0].player_queue.add_action_to_queue((3,0), self.ACTION_MOVE_NORMAL, DIR_RIGHT) 
-            self.players[0].player_queue.add_action_to_queue((3,1), self.ACTION_MOVE_NORMAL, DIR_RIGHT) 
-            self.players[0].player_queue.add_action_to_queue((3,2), self.ACTION_MOVE_NORMAL, DIR_DOWN) 
-            
-            self.players[1].player_queue.add_action_to_queue((3,1), self.ACTION_MOVE_NORMAL, DIR_DOWN) 
-            self.players[1].player_queue.add_action_to_queue((4,1), self.ACTION_MOVE_NORMAL, DIR_RIGHT) 
-            self.players[1].player_queue.add_action_to_queue((4,2), self.ACTION_MOVE_HALF, DIR_DOWN) 
-            self.players[1].player_queue.add_action_to_queue((4,2), self.ACTION_MOVE_HALF, DIR_UP) 
-            
-            #print(self.players[0].player_queue.print_queue())
             
 
         class GameEntity:
-            colors = { # by player id - tuples of (bg color, fg color)
-                None: ('light grey', 'black'),
-                0: ('dark green', 'white'),
-                1: ('light green', 'black'),
-                2: ('crimson', 'white'),
-                3: ('violet', 'black'),
-                4: ('light blue', 'dark grey'),
-                5: ('orange', 'black'),
-                6: ('red', 'white')
-            }
+            # player_colors = { # by player id - tuples of (bg color, fg color)
+            #     None: ('light grey', 'black'),
+            #     0: ('dark red', 'white'),
+            #     1: ('light green', 'black'),
+            #     2: ('crimson', 'white'),
+            #     3: ('violet', 'black'),
+            #     4: ('orange', 'black'),
+            #     5: ('yellow', 'black'),
+            #     6: ('light grey', 'black')
+            # }
 
+            
+            
             BEHAVIOR_PETRI = 1
             BEHAVIOR_AMBUSH_PREDATOR = 2
             # etc
@@ -878,6 +917,55 @@ class MadmiralsGameManager:
                         else:
                             pass
                             # print(f'Player {self.user_desc} attempted to exceed queue limit!')
+            
+            def get_available_player_colors():
+                return [
+                    ('dark red', 'white'),
+                    ('light green', 'black'),
+                    ('crimson', 'white'),
+                    ('violet', 'black'),
+                    ('orange', 'black'),
+                    ('yellow', 'black'),
+                    ('dark orange', 'white'),
+                    ('purple', 'white')                    
+                ]
+            
+
+            def get_available_bot_names():
+                return [
+                    'Admiral Blunderdome', 
+                    'Admiral Clumso', 
+                    'Admiral Tripfoot', 
+                    'Admiral Klutz', 
+                    'Admiral Fumblebum', 
+                    'Captain Bumblebling', 
+                    'Admiral Fuming Bull', 
+                    'Commodore Rage', 
+                    'Commodore Clumsy', 
+                    'Seadog Scatterbrain', 
+                    'The Crazed Seadog', 
+                    'Admiral Irritable', 
+                    'Captain Crazy', 
+                    'The Mad Mariner', 
+                    'The Lunatic Lighthousekeeper', 
+                    'The Poetic Pirate', 
+                    'The Fiery Fisherman', 
+                    'The Irascible Islander', 
+                    'The Tempestuous Troubadour', 
+                    'The Irate Inventor', 
+                    'The Eccentric Explorer', 
+                    'Tempestuous King Triton', 
+                    'Mad Mariner', 
+                    'Wrathful Wave Rider', 
+                    'Vivid Voyager', 
+                    'Rhyming Rover', 
+                    'Bluemad Admiral Bee', 
+                    'The Scarlet Steersman', 
+                    'Jocular Jade Jack Tar', 
+                    'Captain Kindly', 
+                    'Captain Cruelty', 
+                    'Commodore Limpy' 
+                ]
                     
 
         def action_is_valid(self, pending_action):
@@ -892,8 +980,9 @@ class MadmiralsGameManager:
 
             start_cell = self.game_board[pending_action.source_address]
             target_cell = self.game_board[pending_action.target_address]
+            #ACTION_MOVE_ALL
             
-            if start_cell.owner == pending_action.user_id and target_cell.cell_type not in (target_cell.CELL_TYPE_MOUNTAIN,):
+            if start_cell.owner == pending_action.user_id and (pending_action.action==self.ACTION_MOVE_ALL or target_cell.cell_type not in (target_cell.CELL_TYPE_MOUNTAIN,target_cell.CELL_TYPE_MOUNTAIN_CRACKED)):
                 return True
             else:
                 return False
@@ -920,12 +1009,14 @@ class MadmiralsGameManager:
             self.turn += 1
 
             if self.end_game_check():
-                tk.messagebox.askokcancel(title='GG', message='gg')
+                # tk.messagebox.askokcancel(title='GG', message='gg')
+                self.fog_of_war = False
                 self.game_status = self.GAME_STATUS_GAME_OVER
+                
 
             ### Cycle through the players in turn_order[]. If the player's queue is not empty, pop the first element and attempt to perform it
             # Invalid moves: 
-            #   - player attempts to move out of bounds or into a mountain, 
+            #   - player attempts to move out of bounds or into a mountain (except when Move All-ing into a mtn), 
             #   - attempts to move from a cell they don't currently own 
             #   - player has fewer than 2 troops in cell
             # advance to the next move in stack if invalid
@@ -950,7 +1041,7 @@ class MadmiralsGameManager:
                             else:
                                 troops_to_move = starting_troops
                                 if troops_to_move == 0:
-                                    print('renounce land (+1 troops bonus)')
+                                    # print('renounce land (+1 troops bonus)')
                                     troops_to_move += 1
 
                         else:
@@ -975,12 +1066,20 @@ class MadmiralsGameManager:
                                 
                                 self.game_board[next_action.target_address].troops *= -1
                                 self.game_board[next_action.target_address].owner = next_action.user_id
+                                
+                                # Mountain breaking check
+                                if self.game_board[next_action.target_address].cell_type in [self.MadCell.CELL_TYPE_MOUNTAIN, self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED]:
+                                    self.game_board[next_action.target_address].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN
 
                                 # check if player captured target's last admiral - if so you inherit their kingdom
                                 if old_owner is not None and self.game_board[next_action.target_address].cell_type == self.MadCell.CELL_TYPE_ADMIRAL:
                                     if self.get_admiral_count(old_owner) <= 0:
                                         print(f'Player {old_owner} defeated')
                                         self.hostile_takeover_of_player(victim=old_owner, victor=uid)
+                            
+                            # Mountain cracking check
+                            elif self.game_board[next_action.target_address].cell_type == self.MadCell.CELL_TYPE_MOUNTAIN:
+                                self.game_board[next_action.target_address].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED
 
                     else:
                         pop_until_valid_or_empty(uid)
@@ -1010,9 +1109,9 @@ class MadmiralsGameManager:
                     owner = self.game_board[(i,j)].owner
                     
                     ADMIRAL_GROW_RATE = 2
-                    CITY_GROW_RATE = 4
+                    CITY_GROW_RATE = 3
                     BLANK_GROW_RATE = 25
-                    SWAMP_DRAIN_RATE = 4
+                    SWAMP_DRAIN_RATE = 2
 
                     if owner is not None:
 
@@ -1029,11 +1128,13 @@ class MadmiralsGameManager:
                             self.game_board[(i,j)].owner = None
                             self.game_board[(i,j)].troops = 0
                                 
-
+                   
             # refresh the text values of each cell
             for i in range(self.num_rows):
                 for j in range(self.num_cols):
-                    self.game_board[(i, j)].update_display_text()
+                    cell = self.game_board[(i,j)]
+                    cell.update_visibility_status(player_id=0)
+                    cell.update_display_text()
 
 
             # Reset the turn order TODO decide on logic (and syntax since apparenty i forget how to shuffle a list)
@@ -1046,7 +1147,9 @@ class MadmiralsGameManager:
             CELL_TYPE_MOUNTAIN = 2
             CELL_TYPE_CITY = 3
             CELL_TYPE_SWAMP = 4
-
+            CELL_TYPE_MOUNTAIN_CRACKED = 5
+            CELL_TYPE_MOUNTAIN_BROKEN = 6
+            
             def __init__(self, parent, row, col):
                 self.parent = parent
                 self.row = row
@@ -1055,20 +1158,56 @@ class MadmiralsGameManager:
                 self.owner = None
                 self.troops = 0 
                 self.display_text = tk.StringVar()
+                self.hidden = True
+
+            def update_visibility_status(self, player_id):
+                if not self.parent.fog_of_war:
+                    self.hidden = False
+                
+                elif self.owner == player_id:
+                    self.hidden = False
+                
+                elif (
+                    (self.row>0 and self.parent.game_board[(self.row-1, self.col)].owner == player_id) or  # top
+                    (self.row>0 and self.col>0 and self.parent.game_board[(self.row-1, self.col-1)].owner == player_id) or # top left
+                    (self.row>0 and self.col<(self.parent.num_cols-1) and self.parent.game_board[(self.row-1, self.col+1)].owner == player_id) or # top right
+                    (self.col>0 and self.parent.game_board[(self.row, self.col-1)].owner == player_id) or # left
+                    (self.col<(self.parent.num_cols-1) and self.parent.game_board[(self.row, self.col+1)].owner == player_id) or # right
+                    (self.row<(self.parent.num_rows-1) and self.col>0 and self.parent.game_board[(self.row+1, self.col-1)].owner == player_id) or # bot left
+                    (self.row<(self.parent.num_rows-1) and self.parent.game_board[(self.row+1, self.col)].owner == player_id) or # bot
+                    (self.row<(self.parent.num_rows-1) and self.col<(self.parent.num_cols-1) and self.parent.game_board[(self.row+1, self.col+1)].owner == player_id)# bot right
+                    ):
+                        # print(f'{(row, col)} {player_id}')
+                        self.hidden = False
+                    
+                else:
+                    self.hidden = True             
             
             def update_display_text(self):
                 str_troops = self.troops if self.troops > 0 else ''
-                if self.cell_type == self.CELL_TYPE_CITY:
-                    self.display_text.set(f'c{str_troops}')  
-                elif self.cell_type == self.CELL_TYPE_ADMIRAL:
-                    self.display_text.set(f'a{str_troops}')  
-                elif self.cell_type == self.CELL_TYPE_MOUNTAIN:
-                    self.display_text.set('M')
-                elif self.cell_type == self.CELL_TYPE_SWAMP:
-                    self.display_text.set(f's{str_troops}')
+                
+                if self.hidden:
+                    if self.cell_type in [self.CELL_TYPE_CITY, self.CELL_TYPE_MOUNTAIN, self.CELL_TYPE_MOUNTAIN_CRACKED]:
+                        self.display_text.set('M')
+                    else:
+                        self.display_text.set('')
 
                 else:
-                    self.display_text.set(f'{str_troops}')  
+                    if self.cell_type == self.CELL_TYPE_CITY:
+                        self.display_text.set(f'C{str_troops}')  
+                    elif self.cell_type == self.CELL_TYPE_ADMIRAL:                        
+                            self.display_text.set(f'A{str_troops}')  
+                    elif self.cell_type == self.CELL_TYPE_MOUNTAIN:
+                        self.display_text.set('M')
+                    elif self.cell_type == self.CELL_TYPE_MOUNTAIN_CRACKED:
+                        self.display_text.set('m')
+                    elif self.cell_type == self.CELL_TYPE_MOUNTAIN_BROKEN:
+                        self.display_text.set(f'~{str_troops}')
+                    elif self.cell_type == self.CELL_TYPE_SWAMP:
+                        self.display_text.set(f'S{str_troops}')
+
+                    else:
+                        self.display_text.set(f'{str_troops}')  
 
 
 if __name__ == '__main__':
