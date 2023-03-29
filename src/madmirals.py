@@ -238,7 +238,7 @@ class MadmiralsGameManager:
             self.parent.game.fog_of_war = not self.parent.game.fog_of_war
 
         def toggle_debug_menu(self):
-            self.parent.debug_mode = not self.parent.debug_mode
+            self.debug_mode = not self.debug_mode
 
         
         def open_about_window(self, root):
@@ -249,6 +249,8 @@ class MadmiralsGameManager:
 
         def populate_game_board_frame(self):
             if not self.frame_game_board is None: self.frame_game_board.destroy()
+            # if not self.h_bar is None: self.h_bar.destroy()
+            # if not self.v_bar is None: self.v_bar.destroy()
             if not self.canvas is None: self.canvas.destroy()
             
             self.frame_game_board = tk.Frame(master=self.root)
@@ -364,7 +366,7 @@ class MadmiralsGameManager:
                                 bg_color = 'dark grey'
                                 fg_color = 'black'
                             elif cell_type == cell.CELL_TYPE_SWAMP:
-                                bg_color = 'dark green'
+                                bg_color = 'green'
                                 fg_color = 'dark grey'
                             else:
                                 bg_color = 'light blue'
@@ -626,10 +628,10 @@ class MadmiralsGameManager:
                 self.turn_order.append(player_id)
         
             if self.num_rows is None:
-                self.num_rows = 7 + abs(int(opensimplex.noise2(0.5, 0.5)*10))
+                self.num_rows = 7 + abs(int(opensimplex.noise2(0.5, 0.5)*9))
                 
             if self.num_cols is None:
-                self.num_cols = 10 + abs(int(opensimplex.noise2(0.5, 0.5)*5))
+                self.num_cols = 10 + abs(int(opensimplex.noise2(0.5, 0.5)*6))
 
             print(f'Rows: {self.num_rows}\tCols: {self.num_cols}\tPlayers{self.num_players}\tSeed{self.seed}')
             
@@ -649,34 +651,87 @@ class MadmiralsGameManager:
             for i in range(self.num_rows):
                 for j in range(self.num_cols):
                     target_cell = self.game_board[(i, j)]
-                    item_id = result[i][j][0]
-                    item_amt = result[i][j][1]
-                    
-                    if item_id < -.5:
+                    target_cell.item_id = result[i][j][0]
+                    target_cell.item_amt = result[i][j][1]
+
+                    if target_cell.item_id < -.5:
                         target_cell.cell_type = target_cell.CELL_TYPE_MOUNTAIN
-                        target_cell.troops = int(abs(item_amt)*50)
+                        target_cell.troops = 25 + int(abs(target_cell.item_amt)*50)
                         
-
-                    elif item_id < -.25:
+                    elif target_cell.item_id < -.25:
                         target_cell.cell_type = target_cell.CELL_TYPE_CITY
-                        target_cell.troops = 35 + int(abs(item_amt)*20)
+                        target_cell.troops = 35 + int(abs(target_cell.item_amt)*25)
 
-                    elif item_id < -.1:
+                    elif target_cell.item_id < -.1:
                         target_cell.cell_type = target_cell.CELL_TYPE_SWAMP
             
             
-            spawn_points_added = 0
+            
+            list_spawn_regions = [] # Each player will be placed in a separate sector of the map. Thus we must have at least as many spawn regions available as players
+
+            num_regions = -1
+            if self.num_players <= 4:
+                num_regions = 4
+            elif self.num_players <= 9: 
+                num_regions = 9
+            elif self.num_players <= 16:
+                num_regions = 16
+            else:
+                raise ValueError('Too many players!')
+            
+            list_spawn_regions = list(range(num_regions))
+            region_height = self.num_rows/math.sqrt(len(list_spawn_regions))
+            region_width = self.num_cols/math.sqrt(len(list_spawn_regions))
+
+            print(f'Cells per region: ({region_width}x{region_height})')
+        
             for p in range(self.num_players):
-                target_cell = self.game_board[(p, p+3)]
+                 # determine spawn region and then pick a spot within it
+
+                # spawn_region determines which quadrant/9th/16th of the board each player spawns in
+                spawn_region = list_spawn_regions.pop(self.seed*321 % len(list_spawn_regions))
+
+                region_map_row = int(spawn_region / math.sqrt(num_regions)) # integer division
+                region_map_col = int(spawn_region % math.sqrt(num_regions))
+
+                
+                
+                top_left_row = int(region_map_row * region_height)
+                top_left_col = int(region_map_col * region_width)
+                max_item_amt = -999
+                max_item_cell = None
+                
+                for check_r in range(top_left_row, top_left_row+int(region_height)):
+                    for check_c in range(top_left_col, top_left_col+int(region_width)):
+                        #print(f'checking {check_r}x{check_c} - item_id {self.game_board[(check_r,check_c)].item_amt}')
+
+                        if self.game_board[(check_r,check_c)].item_amt > max_item_amt:
+                            max_item_amt = self.game_board[(check_r,check_c)].item_amt
+                            max_item_cell = self.game_board[(check_r,check_c)]
+
+
+                print(f'Player {self.players[p].user_id}\tRegion {spawn_region}\t Location is "row" {region_map_row} x "col" {region_map_col} and spawn found at {max_item_cell.row}x{max_item_cell.col}')
+
+                target_cell = max_item_cell
                 target_cell.owner = self.players[p].user_id
                 target_cell.cell_type = target_cell.CELL_TYPE_ADMIRAL
                 target_cell.troops = 1
-                spawn_points_added +=1
+                
 
                 # dev bonus
                 if p == 0: 
                     target_cell.troops = 500
                     self.players[p].user_desc = 'Zeke'
+                # Checks out :)
+                # Region 0 Location is "row" 0 x "col" 0
+                # Region 1 Location is "row" 0 x "col" 1
+                # Region 2 Location is "row" 0 x "col" 2
+                # Region 3 Location is "row" 1 x "col" 0
+                # Region 4 Location is "row" 1 x "col" 1
+                # Region 6 Location is "row" 2 x "col" 0
+                # Region 7 Location is "row" 2 x "col" 1
+                # Region 8 Location is "row" 2 x "col" 2
+                # test!
 
 
             print('test!')
@@ -783,23 +838,9 @@ class MadmiralsGameManager:
                         self.game_board[(i,j)].owner = victor
 
                         self.game_board[(i,j)].troops = math.ceil(self.game_board[(i,j)].troops * TAKEOVER_KEEP_RATE)
-
             
 
         class GameEntity:
-            # player_colors = { # by player id - tuples of (bg color, fg color)
-            #     None: ('light grey', 'black'),
-            #     0: ('dark red', 'white'),
-            #     1: ('light green', 'black'),
-            #     2: ('crimson', 'white'),
-            #     3: ('violet', 'black'),
-            #     4: ('orange', 'black'),
-            #     5: ('yellow', 'black'),
-            #     6: ('light grey', 'black')
-            # }
-
-            
-            
             BEHAVIOR_PETRI = 1
             BEHAVIOR_AMBUSH_PREDATOR = 2
             # etc
@@ -812,6 +853,7 @@ class MadmiralsGameManager:
                 self.color_fg = color_fg
                 self.active = True # set to False upon defeat
                 #self.is_a_player = False # does this entity belong to the player? if so player will be defeated when all such entities are deactivated
+                
                 
                 self.player_queue = self.ActionQueue(self)
 
@@ -927,7 +969,9 @@ class MadmiralsGameManager:
                     ('orange', 'black'),
                     ('yellow', 'black'),
                     ('dark orange', 'white'),
-                    ('purple', 'white')                    
+                    ('purple', 'white'),
+                    ('dark blue', 'white'),
+                    ('white', 'black')
                 ]
             
 
@@ -1109,15 +1153,17 @@ class MadmiralsGameManager:
                     owner = self.game_board[(i,j)].owner
                     
                     ADMIRAL_GROW_RATE = 2
-                    CITY_GROW_RATE = 3
+                    CITY_GROW_RATE = 4
                     BLANK_GROW_RATE = 25
-                    SWAMP_DRAIN_RATE = 2
+                    SWAMP_DRAIN_RATE = 1
+                    BROKEN_MTN_GROW_RATE = 50
 
                     if owner is not None:
 
                         if ((cell_type == self.MadCell.CELL_TYPE_ADMIRAL and self.turn % ADMIRAL_GROW_RATE == 0) or
                             (cell_type == self.MadCell.CELL_TYPE_CITY and self.turn % CITY_GROW_RATE == 0) or
-                            (cell_type == self.MadCell.CELL_TYPE_BLANK and self.turn % BLANK_GROW_RATE == 0)):                   
+                            (cell_type == self.MadCell.CELL_TYPE_BLANK and self.turn % BLANK_GROW_RATE == 0) or
+                            (cell_type == self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN and self.turn % BROKEN_MTN_GROW_RATE == 0)):                   
                                 self.game_board[(i,j)].troops += 1
                         
                         elif cell_type == self.MadCell.CELL_TYPE_SWAMP and self.turn % SWAMP_DRAIN_RATE == 0:
@@ -1155,10 +1201,14 @@ class MadmiralsGameManager:
                 self.row = row
                 self.col = col
                 self.cell_type = self.CELL_TYPE_BLANK
-                self.owner = None
-                self.troops = 0 
-                self.display_text = tk.StringVar()
-                self.hidden = True
+                self.owner = None # user_id of controlling entity, if any
+                self.troops = 0 # the strength of this block (defense) and potential offensive strength, depending on cell type and owner
+                self.hidden = True # when true, the player character should not be able to see display text or custom formatting of this cell
+                self.display_text = tk.StringVar() # what information should the human player be able to glean about this cell?
+                
+
+                self.item_id = None # one of the opensimplex.noise3array values for this cell - used to determine to spawn here - may also be used to determine admiral spawn locations
+                self.item_amt = None # another noise3array value - used to determine how much of an item should be here
 
             def update_visibility_status(self, player_id):
                 if not self.parent.fog_of_war:
