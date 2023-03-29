@@ -734,6 +734,20 @@ class MadmiralsGameManager:
                 # test!
 
 
+
+            # for p in range(self.num_players):
+            #     target_cell = self.game_board[(p, p+3)]
+            #     target_cell.owner = self.players[p].user_id
+            #     target_cell.cell_type = target_cell.CELL_TYPE_ADMIRAL
+            #     target_cell.troops = 1
+                
+
+            #     # dev bonus
+            #     if p == 0: 
+            #         target_cell.troops = 500
+            #         self.players[p].user_desc = 'Zeke'
+
+
             print('test!')
             
             # lol fed the function to openAI and forgot to give it a prompt.. it spit out (including the comment char):
