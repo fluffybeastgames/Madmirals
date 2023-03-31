@@ -38,7 +38,8 @@ class MadmiralsGameManager:
         self.gui = self.MadmiralsGUI(self)
         #self.game = self.MadmiralsGameInstance(self)
         self.game = None
-        
+        self.debug_mode = False # if True, print more statements to console and show seed, maybe add/remove 'toggle fog of war' functionality? and so on (TBD)
+        self.fog_of_war = True # whether or not to hide cells not adjacent to the player
         
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
@@ -48,8 +49,8 @@ class MadmiralsGameManager:
         self.game_loop() # start the game cycle!
         
 
-    def start_or_restart_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, player_name=None):
-        print('start_or_restart_game')
+    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, player_name=None):
+        print('create_new_game')
 
         self.game = self.MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode='normal', num_players=num_players)
         
@@ -108,7 +109,49 @@ class MadmiralsGameManager:
             self.frame_win_conditions = tk.Frame(master=self.root)
             self.canvas = Canvas(self.frame_scoreboard)
 
-            self.font_size = self.DEFAULT_FONT_SIZE
+            self.cell_font_size = self.DEFAULT_FONT_SIZE
+            self.apply_bindings()
+
+            self.about_window = None # except while open
+            self.settings_window = None # except while open
+            
+
+
+        def apply_bindings(self):
+            # Apply keyboard
+            self.root.bind('<Key>', self.key_press_handler)
+            self.root.bind('<MouseWheel>', self.zoom_wheel_handler) # Windows OS support
+            # self.root.bind('<Button-4>', self.zoom_wheel_handler) # Linux OS support
+            # self.root.bind('<Button-5>', self.zoom_wheel_handler) # Linux OS support
+            self.root.bind('<Control-Q>', self.quit_game)
+            self.root.bind('<Control-q>', self.quit_game)
+            self.root.bind('<Control-N>', self.open_game_settings)          # WARNING this will be reversed if caps lock is on.. look into 
+            self.root.bind('<Control-n>', self.new_game)                    # bind_caps_lock = e1.bind('<Lock-KeyPress>', caps_lock_on)  
+            # self.root.bind('<Control-M>', self.open_game_settings)
+            # self.root.bind('<Control-m>', self.open_game_settings)
+            self.root.bind('<Control-F>', self.toggle_fog_of_war)
+            self.root.bind('<Control-f>', self.toggle_fog_of_war)
+            self.root.bind('<Control-D>', self.toggle_debug_mode)
+            
+
+        def zoom_wheel_handler(self, event):
+            # event.num for Linux, event.delta for Windows
+            if event.num == 5 or event.delta == -120:
+                self.zoom_out(increment=1)
+            if event.num == 4 or event.delta == 120:
+                self.zoom_in(increment=1)            
+
+        def quit_game(self, event=None):
+            print('test')
+            self.root.destroy()
+ 
+        def new_game(self, event=None):
+            num_rows = None
+            num_cols = None
+            num_players = None
+            seed = None 
+
+            self.parent.create_new_game(num_rows, num_cols, num_players, seed)            
 
         class GUI_Assets: 
             MAGIC_NUM_TO_FIX_CELL_SIZE = 5 # tk.Button seems to add 5 px to the height and width 
@@ -145,19 +188,28 @@ class MadmiralsGameManager:
         
         def key_press_handler(self, event):
             CHAR_ESCAPE = '\x1b'
-            interesting_chars = ['W', 'w', 'A', 'a', 'S','s', 'D', 'd', 'E', 'e', CHAR_ESCAPE]
+            interesting_chars = ['W', 'w', 'A', 'a', 'S','s', 'D', 'd', 'E', 'e', CHAR_ESCAPE, '-', '=', '0']
             interesting_syms = ['Up', 'Down', 'Left', 'Right']
             player_id = 0 # TODO THIS NEEDS TO BE UPDATED
             
-            if event.char in interesting_chars or event.keysym in interesting_syms:
+            if self.parent.game is not None and (event.char in interesting_chars or event.keysym in interesting_syms):
                 active_cell_address = self.parent.game.active_cell
                 
                 if event.char == CHAR_ESCAPE:
-                    if self.parent.game.active_cell:
-                        self.parent.game.active_cell = None
-                    else:
-                        print('todo toggle pause window on ESC if nothing is selected?')
+                        if self.parent.game.active_cell:
+                            self.parent.game.active_cell = None
+                        else:
+                            print('todo toggle pause window on ESC if nothing is selected?')
                 
+                elif event.char in ['-', '=', '0']: # zoom control
+                    if event.char == '-':
+                        self.zoom_out()
+                    elif event.char == '=':
+                        self.zoom_in()
+                    else:
+                        self.zoom_reset()
+
+
                 elif event.char in ['E', 'e']: # undo a step
                     last_action = self.parent.game.players[player_id].player_queue.pop_queued_action(-1)
 
@@ -185,207 +237,211 @@ class MadmiralsGameManager:
                     self.parent.game.players[player_id].player_queue.add_action_to_queue(active_cell_address, action, dir) 
                     self.parent.game.move_active_cell(dir)
                     self.parent.game.players[player_id].right_click_pending_address = None
+                
+                
                     
 
         def create_menu_bar(self, root):
             menubar = tk.Menu(root)
             
             filemenu = tk.Menu(menubar, tearoff=0)
-            filemenu.add_command(label='New Game', command=self.restart_game)
-            filemenu.add_command(label='New Game...', command=self.open_new_game_window)
+            filemenu.add_command(label='New Game', command=self.new_game, accelerator='Ctrl+N')
+            filemenu.add_command(label='Game Settings', command=self.open_game_settings, accelerator='Ctrl+Shift+N')
             filemenu.add_separator()
             filemenu.add_command(label='About', command=self.open_about_window)
             filemenu.add_separator()
-            filemenu.add_command(label='Exit', command=self.root.quit)
+            filemenu.add_command(label='Exit', command=self.root.quit, accelerator='Ctrl+Q')
             
             game_menu = tk.Menu(menubar, tearoff=0)
-            game_menu.add_command(label='Zoom In', command=self.zoom_in)
-            game_menu.add_command(label='Zoom Out', command=self.zoom_out)
-            game_menu.add_command(label='Reset Zoom', command=self.zoom_reset)
+            game_menu.add_command(label='Zoom In', command=self.zoom_in, accelerator='=')
+            game_menu.add_command(label='Zoom Out', command=self.zoom_out, accelerator='-')
+            game_menu.add_command(label='Reset Zoom', command=self.zoom_reset, accelerator='0')
             
-            game_menu.add_command(label='Toggle Fog of War', command=self.toggle_fog_of_war)
-            game_menu.add_command(label='Toggle Debug Mode', command=self.toggle_debug_menu)
+            game_menu.add_command(label='Toggle Fog of War', command=self.toggle_fog_of_war, accelerator='Ctrl+F')
+            game_menu.add_command(label='Toggle Debug Mode', command=self.toggle_debug_mode, accelerator='Ctrl+D')
             
             menubar.add_cascade(label='File', menu=filemenu)
             menubar.add_cascade(label='Game', menu=game_menu)
 
             return menubar
-        
-        def restart_game(self):
-            num_rows = None
-            num_cols = None
-            num_players = None
-            seed = None 
-
-            self.parent.start_or_restart_game(num_rows, num_cols, num_players, seed)
-            
-        def zoom_in(self):
-            print('zoom in')
-            if self.font_size < self.MAX_FONT_SIZE:
-                self.font_size += 2                        
+  
+        def zoom_in(self, increment=3):
+            if self.cell_font_size < self.MAX_FONT_SIZE:
+                self.cell_font_size = min(self.cell_font_size+increment, self.MAX_FONT_SIZE)
                         
-
-        def zoom_out(self):
-            print('zoom out')
-            if self.font_size > self.MIN_FONT_SIZE:
-                self.font_size -= 2
+        def zoom_out(self, increment=3):
+            if self.cell_font_size > self.MIN_FONT_SIZE:
+                self.cell_font_size = max(self.cell_font_size-increment,self.MIN_FONT_SIZE)
 
         def zoom_reset(self):
-            print('zoom reset')
-            self.font_size = self.DEFAULT_FONT_SIZE
+            self.cell_font_size = self.DEFAULT_FONT_SIZE
 
-        def toggle_fog_of_war(self):
-            self.parent.game.fog_of_war = not self.parent.game.fog_of_war
+        def toggle_fog_of_war(self, event=None):
+            if self.parent.game is not None:
+                print('Toggling fog of war')
+                self.parent.fog_of_war = not self.parent.fog_of_war
 
-        def toggle_debug_menu(self):
-            self.debug_mode = not self.debug_mode
+        def toggle_debug_mode(self):
+            self.parent.debug_mode = not self.parent.debug_mode
+            print(f'Set debug mode to {self.parent.debug_mode}')
 
 
-        def open_new_game_window(self):
-            top = tk.Toplevel(self.root)
-            # top.geometry('500x550')
-            top.title('New Game Settings')
-            lbl_header = tk.Label(top, text= 'Game Settings', font=('Helvetica 10 bold'))
-            lbl_player = tk.Label(top, text= 'Player Name:', font=('Helvetica 10 bold'))
-            lbl_bots = tk.Label(top, text= 'Number of Bots:', font=('Helvetica 10 bold'))
-            lbl_rows = tk.Label(top, text= 'Row Count:', font=('Helvetica 10 bold'))
-            lbl_cols = tk.Label(top, text= 'Column Count:', font=('Helvetica 10 bold'))
-            lbl_seed = tk.Label(top, text= 'Game Seed:', font=('Helvetica 10 bold'))
+        def open_game_settings(self, event=None):
+            # print(self.settings_window)
+            # if self.settings_window is not None:
+            #     pass
+            # else:
+                self.settings_window = tk.Toplevel(self.root)
+                # self.settings_window.geometry('500x550')
+                self.settings_window.title('New Game Settings')
+                lbl_header = tk.Label(self.settings_window, text= 'Game Settings', font=('Helvetica 10 bold'))
+                lbl_player = tk.Label(self.settings_window, text= 'Player Name:', font=('Helvetica 10 bold'))
+                lbl_bots = tk.Label(self.settings_window, text= 'Number of Bots:', font=('Helvetica 10 bold'))
+                lbl_rows = tk.Label(self.settings_window, text= 'Row Count:', font=('Helvetica 10 bold'))
+                lbl_cols = tk.Label(self.settings_window, text= 'Column Count:', font=('Helvetica 10 bold'))
+                lbl_seed = tk.Label(self.settings_window, text= 'Game Seed:', font=('Helvetica 10 bold'))
 
-            MIN_BOTS = 1
-            MAX_BOTS = 15
-            MIN_ROW_OR_COL = 4
-            MAX_ROW_OR_COL = 20
+                MIN_BOTS = 1
+                MAX_BOTS = 15
+                MIN_ROW_OR_COL = 4
+                MAX_ROW_OR_COL = 20
 
-            USE_DEFAULT = 0
-            USE_CUST = 1
+                USE_DEFAULT = 0
+                USE_CUST = 1
 
-            top.val_bots = tk.DoubleVar()
-            top.val_rows = tk.DoubleVar()
-            top.val_cols = tk.DoubleVar()
-            
-
-            def slider_changed_bots(event):
-                top.bots_rand_or_cust.set(USE_CUST)
-
-            def slider_changed_rows(event):
-                top.rows_rand_or_cust.set(USE_CUST)
-
-            def slider_changed_cols(event):
-                top.cols_rand_or_cust.set(USE_CUST)
-
-            top.slider_bots = tk.Scale(
-                top, orient='horizontal', showvalue=True,
-                variable=top.val_bots, command=slider_changed_bots,
-                from_=MIN_BOTS, to=MAX_BOTS, troughcolor='blue', 
-                tickinterval=2, length=200, sliderlength=40
-            )
-            top.slider_rows = tk.Scale(
-                top, orient='horizontal', showvalue=True,
-                variable=top.val_rows, command=slider_changed_rows,
-                from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue', 
-                tickinterval=2, length=200, sliderlength=40
-            )
-            top.slider_cols = tk.Scale(
-                top, orient='horizontal', showvalue=True,
-                variable=top.val_cols, command=slider_changed_cols,
-                from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue',
-                tickinterval=2, length=200, sliderlength=40
-            )                
-
-            top.bots_rand_or_cust = tk.IntVar()
-            top.bots_rand_or_cust.set(USE_DEFAULT) 
-            top.rand_bots = tk.Radiobutton(top, variable=top.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
-            top.cust_bots = tk.Radiobutton(top, variable=top.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
-            
-            top.rows_rand_or_cust = tk.IntVar()
-            top.rows_rand_or_cust.set(USE_DEFAULT)
-            top.rand_rows = tk.Radiobutton(top, variable=top.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
-            top.cust_rows = tk.Radiobutton(top, variable=top.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
-            
-            top.cols_rand_or_cust = tk.IntVar()
-            top.cols_rand_or_cust.set(USE_DEFAULT)
-            top.rand_cols = tk.Radiobutton(top, variable=top.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
-            top.cust_cols = tk.Radiobutton(top, variable=top.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
-            
-            top.new_seed = tk.StringVar()
-            top.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
-            top.seed_entry = tk.Entry(top, textvariable=top.new_seed, width=20)
-
-            def generate_new_seed():
-                top.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
-
-            def generate_new_user():
-                print('TODO make new user! And also convert the user entry to a dropdown :)')
-
-            top.btn_generate_new_seed = tk.Button(master=top, text='New Seed', width=14, height=1, highlightcolor='orange', command=generate_new_seed, bg='light blue')
-            top.btn_generate_new_user = tk.Button(master=top, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
-
-            top.player_name = tk.StringVar()
-            top.player_name.set('Name') # a random seed, same range as default 'New Game'
-            top.player_name_entry = tk.Entry(top, textvariable=top.player_name, width=20)
-            
-            def okthen():
-                print('okey')
-                # TODO 
-                # Validate input; if valid, create a new instance of game with the passed params then kill this window
-                # print('Validating input')
-                # top.player_name
-                # top.new_seed
-
-                #con.execute("insert into person(firstname) values (?)", (firstname_from_client,))
-            
-                num_players = int((top.val_bots.get()+1)) if top.bots_rand_or_cust.get() == USE_CUST else None
-                num_rows = int(top.val_rows.get()) if top.rows_rand_or_cust.get() == USE_CUST else None
-                num_cols = int(top.val_cols.get()) if top.cols_rand_or_cust.get() == USE_CUST else None
+                self.settings_window.val_bots = tk.DoubleVar()
+                self.settings_window.val_rows = tk.DoubleVar()
+                self.settings_window.val_cols = tk.DoubleVar()
                 
-                seed = None 
+                def slider_changed_bots(event):
+                    self.settings_window.bots_rand_or_cust.set(USE_CUST)
 
-                self.parent.start_or_restart_game(num_rows, num_cols, num_players, seed)
+                def slider_changed_rows(event):
+                    self.settings_window.rows_rand_or_cust.set(USE_CUST)
+
+                def slider_changed_cols(event):
+                    self.settings_window.cols_rand_or_cust.set(USE_CUST)
+
+                self.settings_window.slider_bots = tk.Scale(
+                    self.settings_window, orient='horizontal', showvalue=True,
+                    variable=self.settings_window.val_bots, command=slider_changed_bots,
+                    from_=MIN_BOTS, to=MAX_BOTS, troughcolor='blue', 
+                    tickinterval=2, length=200, sliderlength=40
+                )
+                self.settings_window.slider_rows = tk.Scale(
+                    self.settings_window, orient='horizontal', showvalue=True,
+                    variable=self.settings_window.val_rows, command=slider_changed_rows,
+                    from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue', 
+                    tickinterval=2, length=200, sliderlength=40
+                )
+                self.settings_window.slider_cols = tk.Scale(
+                    self.settings_window, orient='horizontal', showvalue=True,
+                    variable=self.settings_window.val_cols, command=slider_changed_cols,
+                    from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue',
+                    tickinterval=2, length=200, sliderlength=40
+                )                
+
+                self.settings_window.bots_rand_or_cust = tk.IntVar()
+                self.settings_window.bots_rand_or_cust.set(USE_DEFAULT) 
+                self.settings_window.rand_bots = tk.Radiobutton(self.settings_window, variable=self.settings_window.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
+                self.settings_window.cust_bots = tk.Radiobutton(self.settings_window, variable=self.settings_window.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
                 
-                top.destroy()
-
-
-            def okcancel():
-                print('d\'ohkey')
-                top.destroy()
+                self.settings_window.rows_rand_or_cust = tk.IntVar()
+                self.settings_window.rows_rand_or_cust.set(USE_DEFAULT)
+                self.settings_window.rand_rows = tk.Radiobutton(self.settings_window, variable=self.settings_window.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
+                self.settings_window.cust_rows = tk.Radiobutton(self.settings_window, variable=self.settings_window.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
                 
-            top.btn_ok = tk.Button(master=top, text='OK', width=14, height=3, highlightcolor='orange', command=okthen, bg='light blue')
-            top.btn_cancel = tk.Button(top, text='Cancel', width=14, height=3, highlightcolor='orange', command=okcancel, bg='light blue')
-            
-            # Layout 
-            lbl_header.grid(row=0, column=0, columnspan=4)
-            
-            lbl_player.grid(row=10, column=0)
-            top.player_name_entry.grid(row=10, column=2, columnspan=3, sticky='w')
-            top.btn_generate_new_user.grid(row=10,column=4, columnspan=2, sticky='w')
-            
-            lbl_bots.grid(row=30,column=0, sticky='e', padx=10)
-            lbl_rows.grid(row=31,column=0, sticky='e', padx=10)
-            lbl_cols.grid(row=32,column=0, sticky='e', padx=10)
-            top.rand_bots.grid(row=30,column=2, sticky='w')
-            top.rand_rows.grid(row=31,column=2, sticky='w')
-            top.rand_cols.grid(row=32,column=2, sticky='w')
-            top.cust_bots.grid(row=30,column=3, sticky='w')
-            top.cust_rows.grid(row=31,column=3, sticky='w')
-            top.cust_cols.grid(row=32,column=3, sticky='w')                        
-            top.slider_bots.grid(row=30,column=4, sticky='w', padx=10)
-            top.slider_rows.grid(row=31,column=4, sticky='w', padx=10)
-            top.slider_cols.grid(row=32,column=4, sticky='w', padx=10)
-            
-            lbl_seed.grid(row=40,column=0, sticky='w')
-            top.seed_entry.grid(row=40,column=2, columnspan=2, sticky='w')
-            top.btn_generate_new_seed.grid(row=40,column=4, columnspan=2, sticky='w')
-            
-            top.btn_ok.grid(row=50,column=2, pady=10)
-            top.btn_cancel.grid(row=50,column=4, pady=10)
-            
+                self.settings_window.cols_rand_or_cust = tk.IntVar()
+                self.settings_window.cols_rand_or_cust.set(USE_DEFAULT)
+                self.settings_window.rand_cols = tk.Radiobutton(self.settings_window, variable=self.settings_window.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
+                self.settings_window.cust_cols = tk.Radiobutton(self.settings_window, variable=self.settings_window.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
+                
+                self.settings_window.new_seed = tk.StringVar()
+                self.settings_window.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
+                self.settings_window.seed_entry = tk.Entry(self.settings_window, textvariable=self.settings_window.new_seed, width=20)
+
+                def generate_new_seed():
+                    self.settings_window.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
+
+                def generate_new_user():
+                    print('TODO make new user! And also convert the user entry to a dropdown :)')
+
+                self.settings_window.btn_generate_new_seed = tk.Button(master=self.settings_window, text='New Seed', width=14, height=1, highlightcolor='orange', command=generate_new_seed, bg='light blue')
+                self.settings_window.btn_generate_new_user = tk.Button(master=self.settings_window, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
+
+                self.settings_window.player_name = tk.StringVar()
+                self.settings_window.player_name.set('Name') # a random seed, same range as default 'New Game'
+                self.settings_window.player_name_entry = tk.Entry(self.settings_window, textvariable=self.settings_window.player_name, width=20)
+                
+                def okthen():
+                    print('okey')
+                    # Validate input; if valid, create a new instance of game with the passed params then kill this window
+
+                
+                    num_players = int((self.settings_window.val_bots.get()+1)) if self.settings_window.bots_rand_or_cust.get() == USE_CUST else None
+                    num_rows = int(self.settings_window.val_rows.get()) if self.settings_window.rows_rand_or_cust.get() == USE_CUST else None
+                    num_cols = int(self.settings_window.val_cols.get()) if self.settings_window.cols_rand_or_cust.get() == USE_CUST else None
+                    
+                    new_seed_text = self.settings_window.new_seed.get()
+                    if new_seed_text.isdigit() and (int(new_seed_text)>0):
+                        seed = int(new_seed_text)
+                    else:
+                        seed = None 
+
+                    self.parent.create_new_game(num_rows, num_cols, num_players, seed)
+                    
+                    self.settings_window.destroy()
+                    # self.settings_window = None
+
+
+                def okcancel():
+                    self.settings_window.destroy()
+                    # self.settings_window = None
+                    
+                self.settings_window.btn_ok = tk.Button(master=self.settings_window, text='OK', width=14, height=3, highlightcolor='orange', command=okthen, bg='light blue')
+                self.settings_window.btn_cancel = tk.Button(self.settings_window, text='Cancel', width=14, height=3, highlightcolor='orange', command=okcancel, bg='light blue')
+                
+                # Layout 
+                lbl_header.grid(row=0, column=0, columnspan=4)
+                
+                lbl_player.grid(row=10, column=0)
+                self.settings_window.player_name_entry.grid(row=10, column=2, columnspan=3, sticky='w')
+                self.settings_window.btn_generate_new_user.grid(row=10,column=4, columnspan=2, sticky='w')
+                
+                lbl_bots.grid(row=30,column=0, sticky='e', padx=10)
+                lbl_rows.grid(row=31,column=0, sticky='e', padx=10)
+                lbl_cols.grid(row=32,column=0, sticky='e', padx=10)
+                self.settings_window.rand_bots.grid(row=30,column=2, sticky='w')
+                self.settings_window.rand_rows.grid(row=31,column=2, sticky='w')
+                self.settings_window.rand_cols.grid(row=32,column=2, sticky='w')
+                self.settings_window.cust_bots.grid(row=30,column=3, sticky='w')
+                self.settings_window.cust_rows.grid(row=31,column=3, sticky='w')
+                self.settings_window.cust_cols.grid(row=32,column=3, sticky='w')                        
+                self.settings_window.slider_bots.grid(row=30,column=4, sticky='w', padx=10)
+                self.settings_window.slider_rows.grid(row=31,column=4, sticky='w', padx=10)
+                self.settings_window.slider_cols.grid(row=32,column=4, sticky='w', padx=10)
+                
+                lbl_seed.grid(row=40,column=0, sticky='w')
+                self.settings_window.seed_entry.grid(row=40,column=2, columnspan=2, sticky='w')
+                self.settings_window.btn_generate_new_seed.grid(row=40,column=4, columnspan=2, sticky='w')
+                
+                self.settings_window.btn_ok.grid(row=50,column=2, pady=10)
+                self.settings_window.btn_cancel.grid(row=50,column=4, pady=10)
+                
 
         def open_about_window(self):
-            top = tk.Toplevel(self.root)
-            top.geometry('500x250')
-            top.title('About Madmirals')
-            tk.Label(top, text= 'All About Madmirals', font=('Helvetica 14 bold')).place(x=150,y=80)
+            self.about_window = tk.Toplevel(self.root)
+            # self.about_window.geometry('500x250')
+            self.about_window.title('About Madmirals')
+            tk.Label(self.about_window, text='Madmirals', font=('Helvetica 14 bold')).grid(row=0,column=0)
+            tk.Label(self.about_window, text='A game by Matt Carleton', font=('Helvetica 12')).grid(row=1,column=0, sticky='w')
+
+            tk.Label(self.about_window, text='How to Play', font=('Helvetica 12 bold')).grid(row=2,column=0, sticky='w')
+            tk.Label(self.about_window, text='1. Starting a new game', font=('Helvetica 10 bold')).grid(row=3,column=0, sticky='w')
+            tk.Label(self.about_window, text='Click New Game in the File menu (shortcut Ctrl+N) to create a new game with randomized parameters', font=('Helvetica 10')).grid(row=4,column=0, sticky='w')
+            tk.Label(self.about_window, text='To customize the parameters of the game, click on Game Settings in the File menu (shortcut Ctrl+Shift+N)', font=('Helvetica 10')).grid(row=5,column=0, sticky='w')
+            
+
 
 
         def populate_game_board_frame(self):
@@ -425,8 +481,6 @@ class MadmiralsGameManager:
                     self.board_cell_buttons[(i, j)].bind('<Button-1>', partial(self.btn_left_click, (i,j)))
                     self.board_cell_buttons[(i, j)].bind('<Button-2>', partial(self.btn_middle_click, (i,j)))
                     self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
-
-            self.root.bind('<Key>', self.key_press_handler)
             
             self.frame_buttons.grid(row=0, column=0)
             self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=5)
@@ -486,7 +540,7 @@ class MadmiralsGameManager:
                         relief = tk.RAISED if self.parent.game.active_cell == (i,j) else tk.SUNKEN
                         cell_type = cell.cell_type
                                         
-                        if self.parent.game.fog_of_war and cell.hidden:
+                        if self.parent.fog_of_war and cell.hidden:
                             bg_color = 'black'
                             fg_color = 'grey'
                         else:
@@ -508,7 +562,7 @@ class MadmiralsGameManager:
                        
 
                         #font = ('Arial 18 bold') if cell_type in [self.parent.game.MadCell.CELL_TYPE_MOUNTAIN,] else ('Arial 14')  # ooh this was a fun experiment - mountains stand out more, and clusters of non-mountains look like meadows..
-                        font = (f'Arial {self.font_size} bold')
+                        font = (f'Arial {self.cell_font_size} bold')
                         
                 
                         if False: #TODO FIX img behavior and add other images
@@ -580,7 +634,6 @@ class MadmiralsGameManager:
             self.parent = parent
             self.seed = seed # the world seed used for generating the level
             self.game_id = None # the id of the game in table game_logs
-            self.fog_of_war = True
             
             self.game_status = self.GAME_STATUS_INIT
             self.turn = 0
@@ -639,7 +692,6 @@ class MadmiralsGameManager:
 
             print(f'Starting... first cell is ({search_queue.queue[0].target_cell.row}, {search_queue.queue[0].target_cell.col})')
             
-
             while(len(search_queue.addresses_already_searched) < self.num_rows*self.num_cols and not entity_found and distance <= MAX_SEARCH_DEPTH):
                 s_item = search_queue.pop_next_search_item()
                 
@@ -770,7 +822,7 @@ class MadmiralsGameManager:
                         target_cell.troops = 25 + int(abs(target_cell.item_amt)*50)
                         
                     elif target_cell.item_id < -.15:
-                        target_cell.cell_type = target_cell.CELL_TYPE_CITY
+                        target_cell.cell_type = target_cell.CELL_TYPE_SHIP
                         target_cell.troops = 35 + int(abs(target_cell.item_amt)*25)
 
                     elif target_cell.item_id < -.5:
@@ -1038,7 +1090,6 @@ class MadmiralsGameManager:
                                 r2 = random.choice([self.parent.ACTION_MOVE_NORMAL, self.parent.ACTION_MOVE_HALF, self.parent.ACTION_MOVE_ALL]) # which action to attempt
                                 r3 = random.choice([DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT])
                                 
-
                                 if r1 > .25: # try adding something
                                 #if r1 > .75: # try adding something
                                     #print(f'attempt grow in dir {r3}')
@@ -1114,8 +1165,6 @@ class MadmiralsGameManager:
                 for j in range(self.num_cols):
                     self.game_board[(i,j)].changed_this_turn = False
         
-            
-
             ### Cycle through the players in turn_order[]. If the player's queue is not empty, pop the first element and attempt to perform it
             # Invalid moves: 
             #   - player attempts to move out of bounds or into a mountain (except when Move All-ing into a mtn), 
@@ -1137,8 +1186,8 @@ class MadmiralsGameManager:
                             troops_to_move = math.trunc(starting_troops/2) # round down w/ truncate to make sure we never move our last troop
 
                         elif next_action.action == self.ACTION_MOVE_ALL:
-                            # print(f'cell type {self.game_board[next_action.source_address].cell_type} / in ({self.MadCell.CELL_TYPE_ADMIRAL} {self.MadCell.CELL_TYPE_CITY}) ')
-                            if self.game_board[next_action.source_address].cell_type in (self.MadCell.CELL_TYPE_ADMIRAL, ): #, self.MadCell.CELL_TYPE_CITY):
+                            # print(f'cell type {self.game_board[next_action.source_address].cell_type} / in ({self.MadCell.CELL_TYPE_ADMIRAL} {self.MadCell.CELL_TYPE_SHIP}) ')
+                            if self.game_board[next_action.source_address].cell_type in (self.MadCell.CELL_TYPE_ADMIRAL, ): #, self.MadCell.CELL_TYPE_SHIP):
                                 troops_to_move = starting_troops - 1
                             else:
                                 troops_to_move = starting_troops
@@ -1219,7 +1268,7 @@ class MadmiralsGameManager:
                     if owner is not None:
 
                         if ((cell_type == self.MadCell.CELL_TYPE_ADMIRAL and self.turn % ADMIRAL_GROW_RATE == 0) or
-                            (cell_type == self.MadCell.CELL_TYPE_CITY and self.turn % CITY_GROW_RATE == 0) or
+                            (cell_type == self.MadCell.CELL_TYPE_SHIP and self.turn % CITY_GROW_RATE == 0) or
                             (cell_type == self.MadCell.CELL_TYPE_BLANK and self.turn % BLANK_GROW_RATE == 0) or
                             (cell_type == self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN and self.turn % BROKEN_MTN_GROW_RATE == 0)):                   
                                 self.game_board[(i,j)].troops += 1
@@ -1247,7 +1296,6 @@ class MadmiralsGameManager:
             for i in range(self.num_players):
                 self.parent.game.players[i].update_land_count()
                 self.parent.game.players[i].update_troop_count()
-
 
             # Reverse the turn order - this was every other turn, a given player has priority over any other particular player
             self.turn_order.reverse()
@@ -1286,13 +1334,28 @@ class MadmiralsGameManager:
 
         class MadCell:
             CELL_TYPE_BLANK = 0
-            CELL_TYPE_ADMIRAL = 1
+            CELL_TYPE_ADMIRAL = 1 # fastest growth rate, regardless of tide. One is by default assigned to each entity, and can also be created by combining 5 ships into 1
             CELL_TYPE_MOUNTAIN = 2
-            CELL_TYPE_CITY = 3
+            CELL_TYPE_SHIP = 3
+            CELL_TYPE_SHIP_2 = 32 # combine 2 ships to make this. Increased growth rate
+            CELL_TYPE_SHIP_3 = 33 # combine 1 ship_2 with a ship to make this. Increased growth rate
+            CELL_TYPE_SHIP_4 = 34 # combine 2 ship_2s or 1 ship_3 and 1 ship to make this. Increased growth rate
+            
             CELL_TYPE_SWAMP = 4
             CELL_TYPE_MOUNTAIN_CRACKED = 5
             CELL_TYPE_MOUNTAIN_BROKEN = 6
-            
+            CELL_TYPE_PUP_UNKNOWN = 7 # an unopened powerup!
+            CELL_TYPE_PUP_FOG_OF_WAR_LIFTED = 8 # briefly lift fog of war (seed will determine duration - with a chance of it lasting all game)
+            CELL_TYPE_PUP_FAR_SIGHT = 9 # increases the distance the player can see (duration via seed)
+            CELL_TYPE_PUP_GROWTH_MULTIPLIER = 10 # increases or decreases the player's spawn rates across all cell types! duration and multiplier via seed.. perhaps allow multipliers between 0 and 1 to reduce generation.. and even negative to cause troops to shrink! 
+            CELL_TYPE_PUP_POISON = 11 # if ALL player cells lose, eg. 1 troop per 2 turns for 25 turns, it makes sense to use the 'shore up' functionality to reduce number of cells temporarily
+
+
+
+            # ooh what about introducing tides!!! every 100 turns or so the tide goes in and out.. 'blank' cells get washed away during high tide (so growth rate is negative), ships aka cities don't produce troops during low tide (growth rate is 0), broken mtn growth rate affected by tides too (produce 0 at high tide, low at low tide?)
+            # color would be light blue at low tide and darker blue at high tide
+            # low chance of a storm coming by and wrecking random cells 
+
             def __init__(self, parent, row, col):
                 self.parent = parent
                 self.row = row
@@ -1303,16 +1366,19 @@ class MadmiralsGameManager:
                 self.hidden = True # when true, the player character should not be able to see display text or custom formatting of this cell
                 self.display_text = tk.StringVar() # what information should the human player be able to glean about this cell?
                 self.changed_this_turn = False # any changes to ownership, troop number, or cell type happen this turn?
+                self.cell_type_last_seen_by_player = None # once the fog of war has been lifted, the player knows what type of cell is here.. or at least was here
                 
                 self.item_id = None # one of the opensimplex.noise3array values for this cell - used to determine to spawn here - may also be used to determine admiral spawn locations
                 self.item_amt = None # another noise3array value - used to determine how much of an item should be here
 
             def update_visibility_status(self, player_id):
-                if not self.parent.fog_of_war:
+                if not self.parent.parent.fog_of_war:
                     self.hidden = False
+                    # self.cell_type_last_seen_by_player = self.cell_type # on second thought let's not
                 
                 elif self.owner == player_id:
                     self.hidden = False
+                    self.cell_type_last_seen_by_player = self.cell_type
                 
                 elif (
                     (self.row>0 and self.parent.game_board[(self.row-1, self.col)].owner == player_id) or  # top
@@ -1326,6 +1392,7 @@ class MadmiralsGameManager:
                     ):
                         # print(f'{(row, col)} {player_id}')
                         self.hidden = False
+                        self.cell_type_last_seen_by_player = self.cell_type
                     
                 else:
                     self.hidden = True             
@@ -1335,13 +1402,25 @@ class MadmiralsGameManager:
                 str_troops = self.troops if self.troops > 0 else ''
                 
                 if self.hidden:
-                    if self.cell_type in [self.CELL_TYPE_CITY, self.CELL_TYPE_MOUNTAIN, self.CELL_TYPE_MOUNTAIN_CRACKED]:
-                        self.display_text.set('M')
+                    if self.cell_type_last_seen_by_player is not None:
+                        if self.cell_type == self.CELL_TYPE_SHIP:
+                            self.display_text.set('C')  
+                        elif self.cell_type == self.CELL_TYPE_ADMIRAL:                        
+                                self.display_text.set('A')  
+                        elif self.cell_type in [self.CELL_TYPE_MOUNTAIN, self.CELL_TYPE_MOUNTAIN_CRACKED]:
+                            self.display_text.set('M')
+                        elif self.cell_type == self.CELL_TYPE_SWAMP:
+                            self.display_text.set('S')
+                        else:
+                            self.display_text.set('')
+
+                    elif self.cell_type in [self.CELL_TYPE_SHIP, self.CELL_TYPE_MOUNTAIN, self.CELL_TYPE_MOUNTAIN_CRACKED, self.CELL_TYPE_MOUNTAIN_BROKEN]:
+                        self.display_text.set('M?')
                     else:
                         self.display_text.set('')
 
                 else:
-                    if self.cell_type == self.CELL_TYPE_CITY:
+                    if self.cell_type == self.CELL_TYPE_SHIP:
                         self.display_text.set(f'C{str_troops}')  
                     elif self.cell_type == self.CELL_TYPE_ADMIRAL:                        
                             self.display_text.set(f'A{str_troops}')  
