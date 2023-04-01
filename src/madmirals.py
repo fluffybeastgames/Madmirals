@@ -3,27 +3,22 @@
 
 # game of life as opponent entity(ies) - can adjust win/lose conditions around ability to influence the preexisting algo
 # spinoff idea: petri wars: spend points to decide numner of starting cells and their respective locations and traits.. then it plays out like conway's game of lie, except maybe w/ ability to place powerups to influence gameplay!
-import random
-import tkinter as tk 
-from tkinter import * 
-from tkinter import messagebox
-from tkinter import ttk
 import time
-from functools import partial
 import math
-import json
+import random
+import sqlite3
 import opensimplex
 import numpy as np
+import tkinter as tk 
+from tkinter import ttk
+from functools import partial
 from PIL import Image
-import matplotlib.pyplot as plt
-from operator import attrgetter
-import sqlite3
-
 
 DIR_UP = 1 
 DIR_DOWN = 2
 DIR_LEFT = 3
 DIR_RIGHT = 4
+DIR_NOWHERE = -1
 
 class MadmiralsGameManager:
     GAME_TURN_SPEED = .5 # in s
@@ -47,18 +42,42 @@ class MadmiralsGameManager:
         # self.game.game_status = self.game.GAME_STATUS_READY
 
         self.game_loop() # start the game cycle!
-        
+    
 
-    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, player_name=None):
-        print('create_new_game')
+    def create_new_replay_game(self, game_id):
+        print('create_new_replay_game')
 
-        self.game = self.MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode='normal', num_players=num_players)
+        sql = f'SELECT game_id, seed, num_rows, num_cols, num_players FROM log_games WHERE game_id={game_id}'
+        self.cur.execute(sql)
+        game_info = self.cur.fetchall()
+
+        self.game = self.MadmiralsGameInstance(self, game_id=game_info[0][0], seed=game_info[0][1], num_rows=game_info[0][2], num_cols=game_info[0][3], num_players=game_info[0][4], game_mode=self.MadmiralsGameInstance.GAME_MODE_REPLAY)
         
         self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
         self.gui.populate_win_conditions_frame()
         
+        self.last_turn_timestamp = time.time()
+        self.after_id = None # for repeating the game loop
 
+        self.fog_of_war = False
+
+        self.game.game_status = self.game.GAME_STATUS_IN_PROGRESS
+    
+        self.game_loop() # start the game cycle!
+                    
+
+
+
+    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None):
+        print('create_new_game')
+
+        self.game = self.MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players)
+        
+        self.gui.populate_game_board_frame()
+        self.gui.populate_scoreboard_frame()
+        self.gui.populate_win_conditions_frame()
+        
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
 
@@ -67,7 +86,12 @@ class MadmiralsGameManager:
         self.game_loop() # start the game cycle!
 
 
-
+    class Replay: # TODO IMPLEMENT instead of current janky setup
+        def __init__(self):
+            
+            self.game_id = 0
+            self.turn = 0
+            self.data = None
 
 
     def game_loop(self):
@@ -107,7 +131,7 @@ class MadmiralsGameManager:
             self.frame_game_board = tk.Frame(master=self.root)
             self.frame_scoreboard = tk.Frame(master=self.root)
             self.frame_win_conditions = tk.Frame(master=self.root)
-            self.canvas = Canvas(self.frame_scoreboard)
+            self.canvas = tk.Canvas(self.frame_scoreboard)
 
             self.cell_font_size = self.DEFAULT_FONT_SIZE
             self.apply_bindings()
@@ -132,6 +156,10 @@ class MadmiralsGameManager:
             self.root.bind('<Control-F>', self.toggle_fog_of_war)
             self.root.bind('<Control-f>', self.toggle_fog_of_war)
             self.root.bind('<Control-D>', self.toggle_debug_mode)
+            self.root.bind('<Control-O>', self.open_replay_window)
+            self.root.bind('<Control-o>', self.open_replay_window)
+
+            
             
 
         def zoom_wheel_handler(self, event):
@@ -150,8 +178,9 @@ class MadmiralsGameManager:
             num_cols = None
             num_players = None
             seed = None 
+            game_mode = self.parent.MadmiralsGameInstance.GAME_MODE_FFA
 
-            self.parent.create_new_game(num_rows, num_cols, num_players, seed)            
+            self.parent.create_new_game(num_rows=num_rows, num_cols=num_cols, num_players=num_players, seed=seed, game_mode=game_mode)            
 
         class GUI_Assets: 
             MAGIC_NUM_TO_FIX_CELL_SIZE = 5 # tk.Button seems to add 5 px to the height and width 
@@ -167,15 +196,15 @@ class MadmiralsGameManager:
         def btn_left_click(self, address, event):
             self.parent.game.active_cell = address
             player_id = 0
-            self.parent.game.players[player_id].retreat_mode = False
+            self.parent.game.players[player_id].commando_mode = False
                 
         def btn_middle_click(self, address, event):
             player_id = 0
             
             if self.parent.game.active_cell == address: # if we are middle clicking on the already active cell, toggle retreat mode
-                self.parent.game.players[player_id].retreat_mode = not self.parent.game.players[player_id].retreat_mode
+                self.parent.game.players[player_id].commando_mode = not self.parent.game.players[player_id].commando_mode
             else:
-                self.parent.game.players[player_id].retreat_mode = True
+                self.parent.game.players[player_id].commando_mode = True
     
             self.parent.game.active_cell = address
             
@@ -183,7 +212,7 @@ class MadmiralsGameManager:
             #print('right click = activate "move half" mode for next action')
             self.parent.game.active_cell = address
             player_id = 0 # TODO THIS NEEDS TO BE UPDATED
-            self.parent.game.players[player_id].retreat_mode = False
+            self.parent.game.players[player_id].commando_mode = False
             self.parent.game.players[player_id].right_click_pending_address = address
         
         def key_press_handler(self, event):
@@ -229,12 +258,17 @@ class MadmiralsGameManager:
 
                     if self.parent.game.players[player_id].right_click_pending_address == active_cell_address:
                         action = self.parent.game.ACTION_MOVE_HALF
-                    elif self.parent.game.players[player_id].retreat_mode:
-                        action = self.parent.game.ACTION_MOVE_ALL # downstread we will override this when crossing admirals/cities
+                    elif self.parent.game.players[player_id].commando_mode:
+                        list_ship_cell_types = [self.parent.game.MadCell.CELL_TYPE_SHIP, self.parent.game.MadCell.CELL_TYPE_SHIP_2, self.parent.game.MadCell.CELL_TYPE_SHIP_3, self.parent.game.MadCell.CELL_TYPE_SHIP_4]
+                        if self.parent.game.game_board[active_cell_address].cell_type in list_ship_cell_types:
+                            action = self.parent.game.ACTION_MOVE_CITY # downstread we will override this when crossing admirals/cities
+                        else:
+                            action = self.parent.game.ACTION_MOVE_ALL # downstread we will override this when crossing admirals/cities
                     else:
                         action = self.parent.game.ACTION_MOVE_NORMAL
             
                     self.parent.game.players[player_id].player_queue.add_action_to_queue(active_cell_address, action, dir) 
+
                     self.parent.game.move_active_cell(dir)
                     self.parent.game.players[player_id].right_click_pending_address = None
                 
@@ -247,6 +281,7 @@ class MadmiralsGameManager:
             filemenu = tk.Menu(menubar, tearoff=0)
             filemenu.add_command(label='New Game', command=self.new_game, accelerator='Ctrl+N')
             filemenu.add_command(label='Game Settings', command=self.open_game_settings, accelerator='Ctrl+Shift+N')
+            filemenu.add_command(label='Open Replay', command=self.open_replay_window, accelerator='Ctrl+O')
             filemenu.add_separator()
             filemenu.add_command(label='About', command=self.open_about_window)
             filemenu.add_separator()
@@ -281,10 +316,16 @@ class MadmiralsGameManager:
                 print('Toggling fog of war')
                 self.parent.fog_of_war = not self.parent.fog_of_war
 
-        def toggle_debug_mode(self):
+        def toggle_debug_mode(self, event=None):
             self.parent.debug_mode = not self.parent.debug_mode
             print(f'Set debug mode to {self.parent.debug_mode}')
 
+        def open_replay_window(self, event=None):
+            print('Open replay')
+            # TODO add a window w/ list of replays and other options
+            game_id = 192
+
+            self.parent.create_new_replay_game(game_id=game_id)     
 
         def open_game_settings(self, event=None):
             # print(self.settings_window)
@@ -376,7 +417,6 @@ class MadmiralsGameManager:
                 def okthen():
                     print('okey')
                     # Validate input; if valid, create a new instance of game with the passed params then kill this window
-
                 
                     num_players = int((self.settings_window.val_bots.get()+1)) if self.settings_window.bots_rand_or_cust.get() == USE_CUST else None
                     num_rows = int(self.settings_window.val_rows.get()) if self.settings_window.rows_rand_or_cust.get() == USE_CUST else None
@@ -388,7 +428,7 @@ class MadmiralsGameManager:
                     else:
                         seed = None 
 
-                    self.parent.create_new_game(num_rows, num_cols, num_players, seed)
+                    self.parent.create_new_game(num_rows, num_cols, num_players, seed, game_mode=self.parent.MadmiralsGameInstance.GAME_MODE_FFA_CUST)
                     
                     self.settings_window.destroy()
                     # self.settings_window = None
@@ -454,13 +494,13 @@ class MadmiralsGameManager:
         
             self.h_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.HORIZONTAL)
             self.v_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.VERTICAL)
-            self.canvas = Canvas(self.frame_game_board, scrollregion=(0, 0, 600, 600), yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
+            self.canvas = tk.Canvas(self.frame_game_board, scrollregion=(0, 0, 600, 600), yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
             self.h_bar['command'] = self.canvas.xview
             self.v_bar['command'] = self.canvas.yview
 
-            self.canvas.grid(column=0, row=0, sticky=(N,W,E,S))
-            self.h_bar.grid(column=0, row=1, sticky=(W,E))
-            self.v_bar.grid(column=1, row=0, sticky=(N,S))
+            self.canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S))
+            self.h_bar.grid(column=0, row=1, sticky=(tk.W,tk.E))
+            self.v_bar.grid(column=1, row=0, sticky=(tk.N,tk.S))
             self.frame_game_board.grid_columnconfigure(0, weight=1)
             self.frame_game_board.grid_rowconfigure(0, weight=1)
 
@@ -525,9 +565,9 @@ class MadmiralsGameManager:
                 self.lbls_cells.append(tk.Label(master=self.frame_scoreboard, text=f'cells {i}',  font=('Arial 16 bold')))
                 self.lbls_troops.append(tk.Label(master=self.frame_scoreboard, text=f'troops {i}',  font=('Arial 16 bold')))
 
-                self.lbls_name[i].grid(row=i + ROW_OFFSET, column=0, sticky=W)
-                self.lbls_cells[i].grid(row=i + ROW_OFFSET, column=1, sticky=E)
-                self.lbls_troops[i].grid(row=i + ROW_OFFSET, column=2, sticky=E)
+                self.lbls_name[i].grid(row=i + ROW_OFFSET, column=0, sticky='w')
+                self.lbls_cells[i].grid(row=i + ROW_OFFSET, column=1, sticky='e')
+                self.lbls_troops[i].grid(row=i + ROW_OFFSET, column=2, sticky='e')
 
             self.frame_scoreboard.grid(row=0, column=9, sticky='n')
         
@@ -624,17 +664,24 @@ class MadmiralsGameManager:
         GAME_STATUS_PAUSE = 3 #
         GAME_STATUS_GAME_OVER_WIN = 4 # game instance is complete and can no longer be played
         GAME_STATUS_GAME_OVER_LOSE = 5 # game instance is complete and can no longer be played
-
+        
+        GAME_MODE_FFA = 1
+        GAME_MODE_FFA_CUST = 2
+        GAME_MODE_REPLAY = 3
+        
         ACTION_MOVE_NORMAL = 1
         ACTION_MOVE_HALF = 2
         ACTION_MOVE_ALL = 3
+        ACTION_MOVE_CITY = 4
+        ACTION_MOVE_NONE = 5
+        
         ACTION_CHARGE = 777 # idea: start a chain of move_normals that extends to the edge of the board (or until it hits a barrier)
                 
-        def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None):
+        def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None):
             self.parent = parent
             self.seed = seed # the world seed used for generating the level
-            self.game_id = None # the id of the game in table game_logs
-            
+            self.game_id = game_id # the id of the game in table game_logs
+            self.game_mode = game_mode
             self.game_status = self.GAME_STATUS_INIT
             self.turn = 0
 
@@ -647,11 +694,22 @@ class MadmiralsGameManager:
             self.players = {} # contains the player objects w/ numeric id
             self.turn_order = [] # the initial order of turns.. can be eg shuffled between turns, or assign priority keys and flip flop between whether or high or low has priority
             
-            self.game_board = {}
+            self.game_board = {} # dictionary where keys are a tuple of (row, col) and the value is a MadCell instance
+
+            self.replay_data = None # IFF game_mode = replay, store the game's record of changes in this object.. TODO refactor replays into a different class
+            self.replay_pos = 0 # IFF game_mode = replay, use this row to iterate through records
             
             self.generate_game_world()
-            self.add_game_to_log()
-            self.record_starting_conditions()
+
+            if self.game_mode == self.GAME_MODE_REPLAY:
+                sql = f'SELECT turn_num, row, col, cell_type, player_id, troops FROM log_game_moves WHERE game_id={self.game_id} ORDER BY turn_num, row, col'
+                self.parent.cur.execute(sql)
+                self.replay_data = self.parent.cur.fetchall()
+
+
+            else:
+                self.add_game_to_log()
+                self.record_starting_conditions()
 
 
         def closest_instance_of_entity(self, entity_type, starting_cell):
@@ -887,7 +945,7 @@ class MadmiralsGameManager:
                 
                 # dev bonus
                 if p == 0: 
-                    #target_cell.troops = 9999 #500
+                    #target_cell.troops = 255 #500
                     self.players[p].user_desc = 'Zeke'
 
 
@@ -945,7 +1003,13 @@ class MadmiralsGameManager:
                 if dir == DIR_LEFT and col > 0: col -= 1
                 if dir == DIR_RIGHT and col < (self.num_cols-1): col += 1
 
-                self.active_cell = (row, col)
+                if self.game_board[(row, col)].hidden:
+                    self.active_cell = (row, col)
+                else:
+                    # check if we can stop the active cell from moving
+                    if self.game_board[(row, col)].cell_type not in [self.MadCell.CELL_TYPE_MOUNTAIN, self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED]:
+                        self.active_cell = (row, col)
+
 
 
         def hostile_takeover_of_player(self, victim, victor):
@@ -1003,7 +1067,7 @@ class MadmiralsGameManager:
                 self.bot_behavior = bot_behavior # what role(s) should this entity perform? None if regular player -- could do this as a dict of one or more behaviors!
 
                 self.right_click_pending_address = None # if the player right clicked on a cell, be ready to move half of troops instead of all
-                self.retreat_mode = False # if true, attempt to move ALL troops instead of all but one
+                self.commando_mode = False # if true, attempt to move ALL troops instead of all but one
 
             def update_land_count(self):
                 num_land = 0
@@ -1048,6 +1112,8 @@ class MadmiralsGameManager:
                             self.target_address = (source_address[0], source_address[1]-1)
                         elif direction == DIR_RIGHT:
                             self.target_address = (source_address[0], source_address[1]+1)
+                        elif direction == DIR_NOWHERE:
+                            self.target_address = (source_address[0], source_address[1])
                         else:
                             raise ValueError('Invalid direction provided!')                            
                 
@@ -1113,7 +1179,35 @@ class MadmiralsGameManager:
 
             start_cell = self.game_board[pending_action.source_address]
             target_cell = self.game_board[pending_action.target_address]
-            #ACTION_MOVE_ALL
+
+            if pending_action.action==self.ACTION_MOVE_NONE: # rest move, valid if player still occupying cell
+                return start_cell.owner == pending_action.user_id
+            
+            elif pending_action.action==self.ACTION_MOVE_CITY:
+
+                if (
+                    start_cell.cell_type in [start_cell.CELL_TYPE_SHIP, start_cell.CELL_TYPE_SHIP_2, start_cell.CELL_TYPE_SHIP_3, start_cell.CELL_TYPE_SHIP_4] and
+                    target_cell.cell_type in [target_cell.CELL_TYPE_BLANK, target_cell.CELL_TYPE_SHIP, target_cell.CELL_TYPE_SHIP_2, target_cell.CELL_TYPE_SHIP_3, target_cell.CELL_TYPE_SHIP_4]
+                ):  
+                    print('move city!')
+                    #TODO move this logic elswhere and make it work if player active celled past here quickly
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), self.parent.game.ACTION_MOVE_NONE, DIR_NOWHERE)
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), self.parent.game.ACTION_MOVE_NONE, DIR_NOWHERE)
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), self.parent.game.ACTION_MOVE_NONE, DIR_NOWHERE)
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), self.parent.game.ACTION_MOVE_NONE, DIR_NOWHERE)
+                    return True
+                else:
+                    return False 
+                
+            elif pending_action.action==self.ACTION_MOVE_ALL: # move all cells, leaving only 1 cell in admiral cells
+                return start_cell.owner == pending_action.user_id
+            
+            elif pending_action.action in [self.ACTION_MOVE_NORMAL, self.ACTION_MOVE_HALF]:
+                if start_cell.owner == pending_action.user_id:
+                    return target_cell.cell_type not in (target_cell.CELL_TYPE_MOUNTAIN, target_cell.CELL_TYPE_MOUNTAIN_CRACKED)
+            else:
+                raise ValueError('Unexpected action detected')
+            
             
             if start_cell.owner == pending_action.user_id and (pending_action.action==self.ACTION_MOVE_ALL or target_cell.cell_type not in (target_cell.CELL_TYPE_MOUNTAIN,target_cell.CELL_TYPE_MOUNTAIN_CRACKED)):
                 return True
@@ -1155,136 +1249,209 @@ class MadmiralsGameManager:
                 
             #tkinter.messagebox.askokcancel(title=None, message=None, **options)
         
-        
-        def advance_game_turn(self): # move / attack / takeover 
-            self.turn += 1
-            
-            #list_changes_this_turn = []
-            # Reset change checker, so that we can look for new changes this turn
-            for i in range(self.num_rows):
-                for j in range(self.num_cols):
-                    self.game_board[(i,j)].changed_this_turn = False
-        
-            ### Cycle through the players in turn_order[]. If the player's queue is not empty, pop the first element and attempt to perform it
-            # Invalid moves: 
-            #   - player attempts to move out of bounds or into a mountain (except when Move All-ing into a mtn), 
-            #   - attempts to move from a cell they don't currently own 
-            #   - player has fewer than 2 troops in cell
-            # advance to the next move in stack if invalid
+    
+        def pop_until_valid_or_empty(self, uid):               
+            next_action = self.players[uid].player_queue.pop_queued_action()
+            if next_action:
+                if self.action_is_valid(next_action):
+                    source_cell = self.game_board[next_action.source_address]
+                    target_cell = self.game_board[next_action.target_address]
 
-            def pop_until_valid_or_empty(uid):               
-                next_action = self.players[uid].player_queue.pop_queued_action()
-                if next_action:
-                    #print(f'Action pending: {next_action.source_address} \t{next_action.action} \t{next_action.direction}\tValid move: {self.action_is_valid(next_action)}')
+                    starting_troops = source_cell.troops
+                    if next_action.action == self.ACTION_MOVE_NORMAL:
+                        troops_to_move = starting_troops - 1
                     
-                    if self.action_is_valid(next_action):
-                        starting_troops = self.game_board[next_action.source_address].troops
-                        if next_action.action == self.ACTION_MOVE_NORMAL:
+                    elif next_action.action == self.ACTION_MOVE_HALF:
+                        troops_to_move = math.trunc(starting_troops/2) # round down w/ truncate to make sure we never move our last troop
+
+                    elif next_action.action == self.ACTION_MOVE_CITY:
+                        troops_to_move = starting_troops
+                                                
+                    elif next_action.action == self.ACTION_MOVE_ALL:
+                        # print(f'cell type {source_cell.cell_type} / in ({self.MadCell.CELL_TYPE_ADMIRAL} {self.MadCell.CELL_TYPE_SHIP}) ')
+                        if source_cell.cell_type in (self.MadCell.CELL_TYPE_ADMIRAL, ): #, self.MadCell.CELL_TYPE_SHIP):
                             troops_to_move = starting_troops - 1
-                        
-                        elif next_action.action == self.ACTION_MOVE_HALF:
-                            troops_to_move = math.trunc(starting_troops/2) # round down w/ truncate to make sure we never move our last troop
-
-                        elif next_action.action == self.ACTION_MOVE_ALL:
-                            # print(f'cell type {self.game_board[next_action.source_address].cell_type} / in ({self.MadCell.CELL_TYPE_ADMIRAL} {self.MadCell.CELL_TYPE_SHIP}) ')
-                            if self.game_board[next_action.source_address].cell_type in (self.MadCell.CELL_TYPE_ADMIRAL, ): #, self.MadCell.CELL_TYPE_SHIP):
-                                troops_to_move = starting_troops - 1
-                            else:
-                                troops_to_move = starting_troops
-                                if troops_to_move == 0:
-                                    # print('renounce land (+1 troops bonus)')
-                                    troops_to_move += 1
-
                         else:
-                            raise ValueError('Unexpected action encountered')
+                            troops_to_move = starting_troops
+                            if troops_to_move == 0:
+                                # print('renounce land (+1 troops bonus)')
+                                troops_to_move += 1
 
-
-                        self.game_board[next_action.source_address].troops -= troops_to_move
-                        
-                        if self.game_board[next_action.source_address].troops <= 0:
-                            self.game_board[next_action.source_address].owner = None
-                            self.game_board[next_action.source_address].changed_this_turn = True
-
-                        # if next_action.action == self.ACTION_MOVE_ALL and troops_to_move == 0:
-                        #     self.game_board[next_action.source_address].owner = None
-                        
-                        if self.game_board[next_action.target_address].owner == next_action.user_id: # combine forces
-                            self.game_board[next_action.target_address].troops += troops_to_move
-                            self.game_board[next_action.target_address].changed_this_turn = True
-                        
-                        else: # combat
-                            self.game_board[next_action.target_address].troops -= troops_to_move
-                            if self.game_board[next_action.target_address].troops < 0:
-                                old_owner = self.game_board[next_action.target_address].owner
-                                self.game_board[next_action.target_address].troops *= -1
-                                self.game_board[next_action.target_address].owner = next_action.user_id
-                                self.game_board[next_action.target_address].changed_this_turn = True
-
-                                # Mountain breaking check
-                                if self.game_board[next_action.target_address].cell_type in [self.MadCell.CELL_TYPE_MOUNTAIN, self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED]:
-                                    self.game_board[next_action.target_address].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN
-                                    self.game_board[next_action.target_address].changed_this_turn = True
-
-                                # check if player captured target's last admiral - if so you inherit their kingdom
-                                if old_owner is not None and self.game_board[next_action.target_address].cell_type == self.MadCell.CELL_TYPE_ADMIRAL:
-                                    if self.get_admiral_count(old_owner) <= 0:
-                                        print(f'Player {old_owner} defeated')
-                                        self.hostile_takeover_of_player(victim=old_owner, victor=uid)
-                            
-                            # Mountain cracking check
-                            elif self.game_board[next_action.target_address].cell_type == self.MadCell.CELL_TYPE_MOUNTAIN:
-                                self.game_board[next_action.target_address].cell_type = self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED
-                                self.game_board[next_action.target_address].changed_this_turn = True
+                    elif next_action.action == self.ACTION_MOVE_NONE:
+                        troops_to_move = 0
 
                     else:
-                        pop_until_valid_or_empty(uid)
+                        raise ValueError('Unexpected action encountered')
 
-            ### Bot behavior phase
-            for i in range(len(self.turn_order)):
-                behavior = self.players[self.turn_order[i]].bot_behavior
-                if behavior == self.GameEntity.BEHAVIOR_AMBUSH_PREDATOR:
-                    self.players[self.turn_order[i]].run_ambush_behavior_check() 
-                
-                if behavior == self.GameEntity.BEHAVIOR_PETRI:
-                    self.players[self.turn_order[i]].run_petri_growth_check() 
-                    
-            ### Action phase
-            for i in range(len(self.turn_order)):
-                #print(f'Player order: {i}\tid: {self.turn_order[i]}\tName: {self.players[self.turn_order[i]].user_desc}')         
-                pop_until_valid_or_empty(self.turn_order[i])
 
-            ### growth phase
-            for i in range(self.num_rows):
-                for j in range(self.num_cols):
-                    cell_type = self.game_board[(i,j)].cell_type
-                    owner = self.game_board[(i,j)].owner
-                    
-                    ADMIRAL_GROW_RATE = 2
-                    CITY_GROW_RATE = 4
-                    BLANK_GROW_RATE = 25
-                    SWAMP_DRAIN_RATE = 1
-                    BROKEN_MTN_GROW_RATE = 50
+                    source_cell.troops -= troops_to_move
+                    source_cell.changed_this_turn = True
 
-                    if owner is not None:
-
-                        if ((cell_type == self.MadCell.CELL_TYPE_ADMIRAL and self.turn % ADMIRAL_GROW_RATE == 0) or
-                            (cell_type == self.MadCell.CELL_TYPE_SHIP and self.turn % CITY_GROW_RATE == 0) or
-                            (cell_type == self.MadCell.CELL_TYPE_BLANK and self.turn % BLANK_GROW_RATE == 0) or
-                            (cell_type == self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN and self.turn % BROKEN_MTN_GROW_RATE == 0)):                   
-                                self.game_board[(i,j)].troops += 1
-                                self.game_board[(i,j)].changed_this_turn = True
+                    if source_cell.troops <= 0:
+                        source_cell.owner = None
                         
-                        elif cell_type == self.MadCell.CELL_TYPE_SWAMP and self.turn % SWAMP_DRAIN_RATE == 0:
-                            self.game_board[(i,j)].troops -= 1
-                            self.game_board[(i,j)].changed_this_turn = True                            
+                        if next_action.action == self.ACTION_MOVE_CITY:
+                            invading_ship_count = 0
+                            
+                            if source_cell.cell_type == source_cell.CELL_TYPE_SHIP: invading_ship_count = 1
+                            elif source_cell.cell_type == source_cell.CELL_TYPE_SHIP_2: invading_ship_count = 2
+                            elif source_cell.cell_type == source_cell.CELL_TYPE_SHIP_3: invading_ship_count = 3
+                            elif source_cell.cell_type == source_cell.CELL_TYPE_SHIP_4: invading_ship_count = 4
+                            else: invading_ship_count = 0
 
-                        # check for loss of property (eg to swampland)
-                        if self.game_board[(i,j)].troops < 0:
-                            self.game_board[(i,j)].owner = None
-                            self.game_board[(i,j)].troops = 0
-                            self.game_board[(i,j)].changed_this_turn = True                            
+                            if target_cell.cell_type == target_cell.CELL_TYPE_SHIP: invading_ship_count += 1
+                            elif target_cell.cell_type == target_cell.CELL_TYPE_SHIP_2: invading_ship_count += 2
+                            elif target_cell.cell_type == target_cell.CELL_TYPE_SHIP_3: invading_ship_count += 3
+                            elif target_cell.cell_type == target_cell.CELL_TYPE_SHIP_4: invading_ship_count += 4
                                 
-                   
+                            output_type = source_cell.CELL_TYPE_SHIP
+
+                            if invading_ship_count == 2:
+                                output_type = source_cell.CELL_TYPE_SHIP_2
+                            elif invading_ship_count == 3:
+                                output_type = source_cell.CELL_TYPE_SHIP_3
+                            elif invading_ship_count == 4:
+                                output_type = source_cell.CELL_TYPE_SHIP_4
+                            elif invading_ship_count > 4:
+                                output_type = source_cell.CELL_TYPE_ADMIRAL
+
+                            source_cell.cell_type = self.MadCell.CELL_TYPE_BLANK
+                            target_cell.cell_type = output_type
+                            #print(f'output cell type: {target_cell.cell_type}')
+
+
+                    if target_cell.owner == next_action.user_id: # combine forces
+                        target_cell.troops += troops_to_move
+                        target_cell.changed_this_turn = True
+                    
+                    else: # combat
+                        target_cell.troops -= troops_to_move
+                        if target_cell.troops < 0:
+                            old_owner = target_cell.owner
+                            target_cell.troops *= -1
+                            target_cell.owner = next_action.user_id
+                            target_cell.changed_this_turn = True
+
+                            # Mountain breaking check
+                            if target_cell.cell_type in [self.MadCell.CELL_TYPE_MOUNTAIN, self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED]:
+                                target_cell.cell_type = self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN
+                                target_cell.changed_this_turn = True
+
+                            # check if player captured target's last admiral - if so you inherit their kingdom
+                            if old_owner is not None and target_cell.cell_type == self.MadCell.CELL_TYPE_ADMIRAL:
+                                if self.get_admiral_count(old_owner) <= 0:
+                                    print(f'Player {old_owner} defeated')
+                                    self.hostile_takeover_of_player(victim=old_owner, victor=uid)
+                        
+                        # Mountain cracking check
+                        elif target_cell.cell_type == self.MadCell.CELL_TYPE_MOUNTAIN:
+                            target_cell.cell_type = self.MadCell.CELL_TYPE_MOUNTAIN_CRACKED
+                            target_cell.changed_this_turn = True
+
+                else:
+                    self.pop_until_valid_or_empty(uid)
+                    
+        def advance_game_turn(self): # move / attack / takeover 
+            self.turn += 1
+
+            if self.game_mode == self.GAME_MODE_REPLAY:
+                #print(f'Replaying turn {self.turn}')
+
+                RE_COL_TURN = 0 # in the query that populated self.replay_data
+                RE_COL_ROW = 1
+                RE_COL_COL = 2
+                RE_COL_TYPE = 3
+                RE_COL_UID = 4
+                RE_COL_TROOPS = 5 
+                
+                
+                if self.replay_data is not None:
+                    #print('replay data')
+                    caught_up_yet = False
+                    while not caught_up_yet:
+                        if self.replay_pos < len(self.replay_data):
+                            move = self.replay_data[self.replay_pos]
+                            # print(f'{self.replay_pos}{move}')
+                            if move[RE_COL_TURN] <= self.turn:
+                                self.game_board[(move[RE_COL_ROW], move[RE_COL_COL])].cell_type = move[RE_COL_TYPE]
+                                self.game_board[(move[RE_COL_ROW], move[RE_COL_COL])].owner = move[RE_COL_UID]
+                                self.game_board[(move[RE_COL_ROW], move[RE_COL_COL])].troops = move[RE_COL_TROOPS]
+                                
+                                self.replay_pos += 1
+                            else:
+                                caught_up_yet = True
+
+                        else:
+                            caught_up_yet = True
+                            self.game_status == self.GAME_STATUS_GAME_OVER_WIN
+                            
+                else:
+                    self.game_status == self.GAME_STATUS_GAME_OVER_WIN
+
+
+
+            elif self.game_mode in [self.GAME_MODE_FFA, self.GAME_MODE_FFA_CUST]: 
+                
+                #list_changes_this_turn = []
+                # Reset change checker, so that we can look for new changes this turn
+                for i in range(self.num_rows):
+                    for j in range(self.num_cols):
+                        self.game_board[(i,j)].changed_this_turn = False
+            
+                ### Cycle through the players in turn_order[]. If the player's queue is not empty, pop the first element and attempt to perform it
+                # Invalid moves: 
+                #   - player attempts to move out of bounds or into a mountain (except when Move All-ing into a mtn), 
+                #   - attempts to move from a cell they don't currently own 
+                #   - player has fewer than 2 troops in cell
+                # advance to the next move in stack if invalid
+
+
+                ### Bot behavior phase
+                for i in range(len(self.turn_order)):
+                    behavior = self.players[self.turn_order[i]].bot_behavior
+                    if behavior == self.GameEntity.BEHAVIOR_AMBUSH_PREDATOR:
+                        self.players[self.turn_order[i]].run_ambush_behavior_check() 
+                    
+                    if behavior == self.GameEntity.BEHAVIOR_PETRI:
+                        self.players[self.turn_order[i]].run_petri_growth_check() 
+                        
+                ### Action phase
+                for i in range(len(self.turn_order)):
+                    #print(f'Player order: {i}\tid: {self.turn_order[i]}\tName: {self.players[self.turn_order[i]].user_desc}')         
+                    self.pop_until_valid_or_empty(self.turn_order[i])
+
+                ### growth phase
+                for i in range(self.num_rows):
+                    for j in range(self.num_cols):
+                        cell_type = self.game_board[(i,j)].cell_type
+                        owner = self.game_board[(i,j)].owner
+                        
+                        ADMIRAL_GROW_RATE = 2
+                        CITY_GROW_RATE = 4
+                        BLANK_GROW_RATE = 25
+                        SWAMP_DRAIN_RATE = 1
+                        BROKEN_MTN_GROW_RATE = 50
+
+                        if owner is not None:
+
+                            if ((cell_type == self.MadCell.CELL_TYPE_ADMIRAL and self.turn % ADMIRAL_GROW_RATE == 0) or
+                                (cell_type == self.MadCell.CELL_TYPE_SHIP and self.turn % CITY_GROW_RATE == 0) or
+                                (cell_type == self.MadCell.CELL_TYPE_BLANK and self.turn % BLANK_GROW_RATE == 0) or
+                                (cell_type == self.MadCell.CELL_TYPE_MOUNTAIN_BROKEN and self.turn % BROKEN_MTN_GROW_RATE == 0)):                   
+                                    self.game_board[(i,j)].troops += 1
+                                    self.game_board[(i,j)].changed_this_turn = True
+                            
+                            elif cell_type == self.MadCell.CELL_TYPE_SWAMP and self.turn % SWAMP_DRAIN_RATE == 0:
+                                self.game_board[(i,j)].troops -= 1
+                                self.game_board[(i,j)].changed_this_turn = True                            
+
+                            # check for loss of property (eg to swampland)
+                            if self.game_board[(i,j)].troops < 0:
+                                self.game_board[(i,j)].owner = None
+                                self.game_board[(i,j)].troops = 0
+                                self.game_board[(i,j)].changed_this_turn = True                            
+                                    
+                
             # refresh the text values of each cell
             for i in range(self.num_rows):
                 for j in range(self.num_cols):
@@ -1297,39 +1464,41 @@ class MadmiralsGameManager:
                 self.parent.game.players[i].update_land_count()
                 self.parent.game.players[i].update_troop_count()
 
-            # Reverse the turn order - this was every other turn, a given player has priority over any other particular player
-            self.turn_order.reverse()
 
-            # Update the db w/ any changes this round
-            list_changes = []
-            for i in range(self.num_rows):
-                for j in range(self.num_cols):
-                    cell = self.game_board[(i,j)]
-                    if cell.changed_this_turn:
-                        # print(f'Turn {self.turn}\tChange detected in cell {i}x{j}\t{cell.owner}\t{cell.troops}\t{cell.cell_type}')
-                        list_changes.append((self.game_id, self.turn, i, j, cell.cell_type, cell.owner, cell.troops))
-            
-            sql = 'INSERT INTO log_game_moves (game_id, turn_num, row, col, cell_type, player_id, troops) VALUES(?,?,?,?,?,?,?)'
-            self.parent.cur.executemany(sql, list_changes)
-            self.parent.con.commit() 
+            if self.game_mode in [self.GAME_MODE_FFA, self.GAME_MODE_FFA_CUST]: 
+                # Reverse the turn order - this was every other turn, a given player has priority over any other particular player
+                self.turn_order.reverse()
 
-            self.update_game_status()
-
-            if self.game_status == self.GAME_STATUS_GAME_OVER_WIN:
-                tk.messagebox.askokcancel(title='GG', message='gg')
-                self.fog_of_war = False
+                # Update the db w/ any changes this round
+                list_changes = []
+                for i in range(self.num_rows):
+                    for j in range(self.num_cols):
+                        cell = self.game_board[(i,j)]
+                        if cell.changed_this_turn:
+                            # print(f'Turn {self.turn}\tChange detected in cell {i}x{j}\t{cell.owner}\t{cell.troops}\t{cell.cell_type}')
+                            list_changes.append((self.game_id, self.turn, i, j, cell.cell_type, cell.owner, cell.troops))
                 
-                # Determine winner
-                active_id = None
-                num_active = 0
-                for i in range(self.num_players):
-                    if self.players[i].active:
-                        num_active += 1 
-                        active_id = self.players[i].user_id
-
-                sql = f'UPDATE log_games SET game_status={self.GAME_STATUS_GAME_OVER_WIN}, winner={active_id} WHERE game_id={self.game_id}'
-                self.parent.cur.execute(sql)
+                sql = 'INSERT INTO log_game_moves (game_id, turn_num, row, col, cell_type, player_id, troops) VALUES(?,?,?,?,?,?,?)'
+                self.parent.cur.executemany(sql, list_changes)
                 self.parent.con.commit() 
+
+                self.update_game_status()
+
+                if self.game_status == self.GAME_STATUS_GAME_OVER_WIN:
+                    tk.messagebox.askokcancel(title='GG', message='gg')
+                    self.fog_of_war = False
+                    
+                    # Determine winner
+                    active_id = None
+                    num_active = 0
+                    for i in range(self.num_players):
+                        if self.players[i].active:
+                            num_active += 1 
+                            active_id = self.players[i].user_id
+
+                    sql = f'UPDATE log_games SET game_status={self.GAME_STATUS_GAME_OVER_WIN}, winner={active_id} WHERE game_id={self.game_id}'
+                    self.parent.cur.execute(sql)
+                    self.parent.con.commit() 
 
 
         class MadCell:
@@ -1340,7 +1509,6 @@ class MadmiralsGameManager:
             CELL_TYPE_SHIP_2 = 32 # combine 2 ships to make this. Increased growth rate
             CELL_TYPE_SHIP_3 = 33 # combine 1 ship_2 with a ship to make this. Increased growth rate
             CELL_TYPE_SHIP_4 = 34 # combine 2 ship_2s or 1 ship_3 and 1 ship to make this. Increased growth rate
-            
             CELL_TYPE_SWAMP = 4
             CELL_TYPE_MOUNTAIN_CRACKED = 5
             CELL_TYPE_MOUNTAIN_BROKEN = 6
@@ -1349,8 +1517,6 @@ class MadmiralsGameManager:
             CELL_TYPE_PUP_FAR_SIGHT = 9 # increases the distance the player can see (duration via seed)
             CELL_TYPE_PUP_GROWTH_MULTIPLIER = 10 # increases or decreases the player's spawn rates across all cell types! duration and multiplier via seed.. perhaps allow multipliers between 0 and 1 to reduce generation.. and even negative to cause troops to shrink! 
             CELL_TYPE_PUP_POISON = 11 # if ALL player cells lose, eg. 1 troop per 2 turns for 25 turns, it makes sense to use the 'shore up' functionality to reduce number of cells temporarily
-
-
 
             # ooh what about introducing tides!!! every 100 turns or so the tide goes in and out.. 'blank' cells get washed away during high tide (so growth rate is negative), ships aka cities don't produce troops during low tide (growth rate is 0), broken mtn growth rate affected by tides too (produce 0 at high tide, low at low tide?)
             # color would be light blue at low tide and darker blue at high tide
@@ -1402,7 +1568,7 @@ class MadmiralsGameManager:
                 str_troops = self.troops if self.troops > 0 else ''
                 
                 if self.hidden:
-                    if self.cell_type_last_seen_by_player is not None:
+                    if self.cell_type_last_seen_by_player is not None: #oops i think this is logically buggy TODO make this report the last cell type seen, not just the current cell type masked if it has been seen before
                         if self.cell_type == self.CELL_TYPE_SHIP:
                             self.display_text.set('C')  
                         elif self.cell_type == self.CELL_TYPE_ADMIRAL:                        
