@@ -1,12 +1,10 @@
-
+### Constants
 
 DIR_UP = 1 
 DIR_DOWN = 2
 DIR_LEFT = 3
 DIR_RIGHT = 4
 DIR_NOWHERE = -1
-
-
 
 ### Cell Type - describes the appearance and behavior of a MadCell object
 CELL_TYPE_BLANK = 0
@@ -19,13 +17,15 @@ CELL_TYPE_SHIP_4 = 34 # combine 2 ship_2s or 1 ship_3 and 1 ship to make this. I
 CELL_TYPE_SWAMP = 4
 CELL_TYPE_MOUNTAIN_CRACKED = 5
 CELL_TYPE_MOUNTAIN_BROKEN = 6
-CELL_TYPE_PUP_UNKNOWN = 7 # an unopened powerup!
-CELL_TYPE_PUP_FOG_OF_WAR_LIFTED = 8 # briefly lift fog of war (seed will determine duration - with a chance of it lasting all game)
-CELL_TYPE_PUP_FAR_SIGHT = 9 # increases the distance the player can see (duration via seed)
-CELL_TYPE_PUP_GROWTH_MULTIPLIER = 10 # increases or decreases the player's spawn rates across all cell types! duration and multiplier via seed.. perhaps allow multipliers between 0 and 1 to reduce generation.. and even negative to cause troops to shrink! 
-CELL_TYPE_PUP_POISON = 11 # if ALL player cells lose, eg. 1 troop per 2 turns for 25 turns, it makes sense to use the 'shore up' functionality to reduce number of cells temporarily
+##Not implemented (yet, anyway)
+# CELL_TYPE_PUP_UNKNOWN = 7 # an unopened powerup!
+# CELL_TYPE_PUP_FOG_OF_WAR_LIFTED = 8 # briefly lift fog of war (seed will determine duration - with a chance of it lasting all game)
+# CELL_TYPE_PUP_FAR_SIGHT = 9 # increases the distance the player can see (duration via seed)
+# CELL_TYPE_PUP_GROWTH_MULTIPLIER = 10 # increases or decreases the player's spawn rates across all cell types! duration and multiplier via seed.. perhaps allow multipliers between 0 and 1 to reduce generation.. and even negative to cause troops to shrink! 
+# CELL_TYPE_PUP_POISON = 11 # if ALL player cells lose, eg. 1 troop per 2 turns for 25 turns, it makes sense to use the 'shore up' functionality to reduce number of cells temporarily
 
 
+## This wasn't being used.. get rid of?
 # DEFAULT_ROWS = None # 9 - if None, then the world generation will pick one pseudo-randomly
 # DEFAULT_COLS = None # 16 - if None, then the world generation will pick one pseudo-randomly
 
@@ -66,3 +66,10 @@ MAX_ROW_OR_COL = 20
 
 USE_DEFAULT = 0 # for radio buttons (use seed default or use a custom override)
 USE_CUST = 1
+
+
+### Scoreboard widgets
+SCORE_BOARD_WIDTH_NAME_MIN = 15
+SCORE_BOARD_WIDTH_NAME_MAX = 35
+SCORE_BOARD_WIDTH_LAND = 4
+SCORE_BOARD_WIDTH_TROOPS = 6

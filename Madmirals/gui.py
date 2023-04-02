@@ -23,7 +23,6 @@ class MadmiralsGUI:
         self.frame_game_board = tk.Frame(master=self.root)
         self.frame_scoreboard = tk.Frame(master=self.root)
         self.frame_win_conditions = tk.Frame(master=self.root)
-        self.canvas = tk.Canvas(self.frame_scoreboard)
 
         self.cell_font_size = DEFAULT_FONT_SIZE
         self.apply_bindings()
@@ -367,18 +366,18 @@ class MadmiralsGUI:
             self.settings_window.player_name_entry.grid(row=10, column=2, columnspan=3, sticky='w')
             self.settings_window.btn_generate_new_user.grid(row=10,column=4, columnspan=2, sticky='w')
             
-            lbl_bots.grid(row=30,column=0, sticky='e', padx=10)
-            lbl_rows.grid(row=31,column=0, sticky='e', padx=10)
-            lbl_cols.grid(row=32,column=0, sticky='e', padx=10)
+            lbl_bots.grid(row=30,column=0, sticky='e', padx=(10,0))
+            lbl_rows.grid(row=31,column=0, sticky='e', padx=(10,0))
+            lbl_cols.grid(row=32,column=0, sticky='e', padx=(10,0))
             self.settings_window.rand_bots.grid(row=30,column=2, sticky='w')
             self.settings_window.rand_rows.grid(row=31,column=2, sticky='w')
             self.settings_window.rand_cols.grid(row=32,column=2, sticky='w')
             self.settings_window.cust_bots.grid(row=30,column=3, sticky='w')
             self.settings_window.cust_rows.grid(row=31,column=3, sticky='w')
             self.settings_window.cust_cols.grid(row=32,column=3, sticky='w')                        
-            self.settings_window.slider_bots.grid(row=30,column=4, sticky='w', padx=10)
-            self.settings_window.slider_rows.grid(row=31,column=4, sticky='w', padx=10)
-            self.settings_window.slider_cols.grid(row=32,column=4, sticky='w', padx=10)
+            self.settings_window.slider_bots.grid(row=30,column=4, sticky='w', padx=(0,10))
+            self.settings_window.slider_rows.grid(row=31,column=4, sticky='w', padx=(0,10))
+            self.settings_window.slider_cols.grid(row=32,column=4, sticky='w', padx=(0,10))
             
             lbl_seed.grid(row=40,column=0, sticky='w')
             self.settings_window.seed_entry.grid(row=40,column=2, columnspan=2, sticky='w')
@@ -389,25 +388,45 @@ class MadmiralsGUI:
 
     def populate_game_board_frame(self):
         if not self.frame_game_board is None: self.frame_game_board.destroy()
-        # if not self.h_bar is None: self.h_bar.destroy()
-        # if not self.v_bar is None: self.v_bar.destroy()
-        if not self.canvas is None: self.canvas.destroy()
+        #if not canvas is None: canvas.destroy()
         
-        self.frame_game_board = tk.Frame(master=self.root)
-    
-        self.h_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.HORIZONTAL)
-        self.v_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.VERTICAL)
-        self.canvas = tk.Canvas(self.frame_game_board, scrollregion=(0, 0, 600, 600), yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
-        self.h_bar['command'] = self.canvas.xview
-        self.v_bar['command'] = self.canvas.yview
+        self.frame_game_board = tk.Frame(master=self.root, width=250, height=250)
+        canvas = tk.Canvas(self.frame_game_board, width=250, height=250, scrollregion=(0, 0, 6000, 6000))
+        
+        hbar=tk.Scrollbar(self.frame_game_board,orient=tk.HORIZONTAL)
+        hbar.grid(row=1, column=0, sticky='ew')
+        hbar.config(command=canvas.xview)
+        vbar=tk.Scrollbar(self.frame_game_board,orient=tk.VERTICAL)
+        vbar.grid(row=0, column=1, sticky='ns')
+        vbar.config(command=canvas.yview)
+        canvas.config(width=250,height=250)
+        canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
+        canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S))
 
-        self.canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S))
-        self.h_bar.grid(column=0, row=1, sticky=(tk.W,tk.E))
-        self.v_bar.grid(column=1, row=0, sticky=(tk.N,tk.S))
-        self.frame_game_board.grid_columnconfigure(0, weight=1)
-        self.frame_game_board.grid_rowconfigure(0, weight=1)
+        #TODO STILL NOT WORKING RIGHT
 
-        self.frame_buttons = tk.Frame(master=self.canvas)
+        # self.h_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.HORIZONTAL)
+        # self.v_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.VERTICAL)
+        
+        # canvas.config(width=250,height=250)
+
+ #yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
+        #canvas.configure(scrollregion=canvas.bbox("all"))
+# canvas.config(width=300,height=300)
+# canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
+# canvas.pack(side=LEFT,expand=True,fill=BOTH)
+
+        # canvas = Canvas(root, scrollregion=(0, 0, 1000, 1000), yscrollcommand=v.set, xscrollcommand=h.set)
+        # h['command'] = canvas.xview
+        # v['command'] = canvas.yview
+
+        # canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S))
+        # self.h_bar.grid(column=0, row=1, sticky=(tk.W,tk.E))
+        # self.v_bar.grid(column=1, row=0, sticky=(tk.N,tk.S))
+        # self.frame_game_board.grid_columnconfigure(0, weight=1)
+        # self.frame_game_board.grid_rowconfigure(0, weight=1)
+
+        self.frame_buttons = tk.Frame(master=canvas)
         
         self.board_cell_buttons = {}
 
@@ -426,7 +445,7 @@ class MadmiralsGUI:
                 self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
         
         self.frame_buttons.grid(row=0, column=0)
-        self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=5)
+        self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=15, padx=(15, 15))
         self.frame_game_board.focus_set()
 
     def populate_win_conditions_frame(self):
@@ -445,34 +464,83 @@ class MadmiralsGUI:
         self.lbl_win_desc.grid(row = 1, column = 0)
         self.lbl_lose_header.grid(row=2, column=0)
         self.lbl_lose_desc.grid(row = 3, column = 0)
-        self.frame_win_conditions.grid(row=1, column=9, sticky='n')
-
+        self.frame_win_conditions.grid(row=1, column=9, sticky='n',  pady=(0, 0), padx=(15,15))
+        
     def populate_scoreboard_frame(self):
         if not self.frame_scoreboard is None:
             self.frame_scoreboard.destroy()
-        self.frame_scoreboard = tk.Frame(master=self.root)
 
+        self.frame_scoreboard = tk.Frame(master=self.root, highlightbackground='black', highlightthickness=3)
         self.lbl_header = tk.Label(master=self.frame_scoreboard, text='Scoreboard', font=('Arial 22 bold'))
         self.lbl_header.grid(row=0, column=0, columnspan=3, sticky='N')
 
         self.lbl_turn_count = tk.Label(master=self.frame_scoreboard, text='Turn 0', font=('Arial 18 bold'))
         self.lbl_turn_count.grid(row = 1, column = 0)
 
+        self.bg_frames = []
+
         self.lbls_name = []
         self.lbls_cells = []
         self.lbls_troops = []
 
+        name_label_width = SCORE_BOARD_WIDTH_NAME_MIN
+        for i in range(self.parent.game.num_players):
+            if len(self.parent.game.players[i].user_desc) > name_label_width:
+                name_label_width = min(len(self.parent.game.players[i].user_desc), SCORE_BOARD_WIDTH_NAME_MAX)
+
+        print(f'Decided on a scoreboard width of {name_label_width}')
+            
+
         ROW_OFFSET = 2
         for i in range(self.parent.game.num_players):
-            self.lbls_name.append(tk.Label(master=self.frame_scoreboard, text=f'player {i}',  font=('Arial 16 bold')))
-            self.lbls_cells.append(tk.Label(master=self.frame_scoreboard, text=f'cells {i}',  font=('Arial 16 bold')))
-            self.lbls_troops.append(tk.Label(master=self.frame_scoreboard, text=f'troops {i}',  font=('Arial 16 bold')))
+            self.bg_frames.append(tk.Frame(master=self.frame_scoreboard))
+            self.lbls_name.append(tk.Label(master=self.bg_frames[i], text=f'player {i}', width=name_label_width, font=('Arial 16 bold'), anchor='w'))
+            self.lbls_cells.append(tk.Label(master=self.bg_frames[i], text=f'cells {i}', width=SCORE_BOARD_WIDTH_LAND, font=('Arial 16 bold'), anchor='e'))
+            self.lbls_troops.append(tk.Label(master=self.bg_frames[i], text=f'troops {i}', width=SCORE_BOARD_WIDTH_TROOPS, font=('Arial 16 bold'), anchor='e'))
 
-            self.lbls_name[i].grid(row=i + ROW_OFFSET, column=0, sticky='w')
-            self.lbls_cells[i].grid(row=i + ROW_OFFSET, column=1, sticky='e')
-            self.lbls_troops[i].grid(row=i + ROW_OFFSET, column=2, sticky='e')
+            self.lbls_name[i].grid_propagate(0)
+            self.lbls_cells[i].grid_propagate(0)
+            self.lbls_troops[i].grid_propagate(0)
+            
+            self.bg_frames[i].grid(row=i + ROW_OFFSET, column=0, sticky='w')
+            #self. columnconfigure(1, weight=1)
+            self.lbls_name[i].grid(row=0, column=0, sticky='ew')
+            self.lbls_cells[i].grid(row=0, column=1, sticky='ew')
+            self.lbls_troops[i].grid(row=0, column=2, sticky='ew')
 
-        self.frame_scoreboard.grid(row=0, column=9, sticky='n')
+        self.frame_scoreboard.grid(row=0, column=9, sticky='n', pady=(15, 0), padx=(15,15), ipady=5)
+    
+
+    # def populate_scoreboard_frame(self):
+    #     if not self.frame_scoreboard is None:
+    #         self.frame_scoreboard.destroy()
+    #     self.frame_scoreboard = tk.Frame(master=self.root, highlightbackground='black', highlightthickness=5)
+    #     self.lbl_header = tk.Label(master=self.frame_scoreboard, text='Scoreboard', font=('Arial 22 bold'))
+    #     self.lbl_header.grid(row=0, column=0, columnspan=3, sticky='N')
+
+    #     self.lbl_turn_count = tk.Label(master=self.frame_scoreboard, text='Turn 0', font=('Arial 18 bold'))
+    #     self.lbl_turn_count.grid(row = 1, column = 0)
+
+    #     self.lbls_name = []
+    #     self.lbls_cells = []
+    #     self.lbls_troops = []
+
+    #     ROW_OFFSET = 2
+    #     for i in range(self.parent.game.num_players):
+    #         self.lbls_name.append(tk.Label(master=self.frame_scoreboard, text=f'player {i}', width=20, font=('Arial 16 bold')))
+    #         self.lbls_cells.append(tk.Label(master=self.frame_scoreboard, text=f'cells {i}', width=5, font=('Arial 16 bold')))
+    #         self.lbls_troops.append(tk.Label(master=self.frame_scoreboard, text=f'troops {i}', width=10, font=('Arial 16 bold')))
+
+    #         self.lbls_name[i].grid_propagate(0)
+    #         self.lbls_cells[i].grid_propagate(0)
+    #         self.lbls_troops[i].grid_propagate(0)
+            
+
+    #         self.lbls_name[i].grid(row=i + ROW_OFFSET, column=0, sticky='ew')
+    #         self.lbls_cells[i].grid(row=i + ROW_OFFSET, column=1, sticky='ew')
+    #         self.lbls_troops[i].grid(row=i + ROW_OFFSET, column=2, sticky='ew')
+
+    #     self.frame_scoreboard.grid(row=0, column=9, sticky='n', pady=(30, 0), padx=(15,45))
     
     def render(self):  
         if self.parent.game is not None:          
@@ -548,10 +616,13 @@ class MadmiralsGUI:
             else:
                 bg = 'light grey'
                 fg = 'dark grey'
-
+            
+            self.bg_frames[score_i].configure(bg='green')
             self.lbls_name[score_i].configure(text=dict_names[uid], bg=bg, fg=fg)
             self.lbls_cells[score_i].configure(text=dict_land[uid], bg=bg, fg=fg)
             self.lbls_troops[score_i].configure(text=dict_troops[uid], bg=bg, fg=fg)
+            
+            
             score_i += 1
 
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over

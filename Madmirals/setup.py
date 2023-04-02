@@ -1,8 +1,8 @@
-import sqlite3
 import os.path
 from os import path
 
-import mad_db
+### Project modules
+from db import MadDBConnection
 
 default_bot_names = [
     ('Admiral Blunderdome',), 
@@ -70,7 +70,7 @@ def setup_game_env():
     
     else:
         # Create a new sqlite database and seed it with tables and default values
-        db = mad_db.MadDBConnection(db_path)
+        db = MadDBConnection(db_path)
         db.create_new_db(default_bot_names, default_colors)
 
         # Describe the new user of the game

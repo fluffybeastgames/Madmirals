@@ -21,13 +21,34 @@ class MadDBConnection:
         self.cur.executemany("INSERT INTO entity_colors (bg_color, fg_color) VALUES(?, ?)", default_colors)
         self.con.commit() 
     
-    def run_sql(self, sql, vals, execute_many=False, commit=True):
-        self.cur.execute_many(sql, vals) if execute_many else self.cur.execute(sql, vals)
-        if commit: self.con.commit() 
+    def run_sql(self, sql, vals=None, execute_many=False, commit=True):
+        if execute_many:
+            if vals is not None:
+                self.cur.executemany(sql, vals) 
+            else:
+                self.cur.executemany(sql) 
+        else:
+            if vals is not None:
+                self.cur.execute(sql, vals)
+            else:
+                self.cur.execute(sql)
 
-    def get_with_sql(self, sql, vals):
-        pass
+        if commit: self.con.commit()
+        return self.cur.lastrowid
 
+    def run_sql_select(self, sql, vals=None, num_vals_selected=None): #TODO Fix the jank here
+        self.cur.execute(sql)
+        if num_vals_selected is None:
+            return self.cur.fetchall()
+        else:
+            out = []
+            for row in self.cur.fetchall():
+                if num_vals_selected == 1: out.append(row[0])
+                elif num_vals_selected == 2: out.append((row[0], row[1]))
+                else: raise ValueError('THIS IS TOO JANKY FIX YOUR CODE')
+        
+        return out
+        
     def log_game(self):
         print('TODO Add db entry for game')
 
