@@ -40,22 +40,35 @@ default_bot_names = [
 ]
 
 default_colors = [
-    ('dark red', 'white'),
-    ('light green', 'black'),
-    ('crimson', 'white'),
-    ('violet', 'black'),
-    ('orange', 'black'),
-    ('yellow', 'black'),
-    ('dark orange', 'white'),
-    ('purple', 'white'),
-    ('dark blue', 'white'),
-    ('white', 'black'),
-    ('white', 'orange'),
-    ('white', 'dark grey'),
-    ('white', 'dark blue'),
-    ('white', 'crimson'),
-    ('white', 'teal'),
-    ('white', 'purple')   
+    ('dark red', 'white', 'dark red'),
+    ('light green', 'black', 'light green'),
+    ('crimson', 'white', 'crimson',),
+    ('violet', 'black', 'violet',),
+    ('orange', 'black', 'orange',),
+    ('yellow', 'black', 'yellow',),
+    ('dark orange', 'white', 'dark orange'),
+    ('purple', 'white', 'purple',),
+    ('dark blue', 'white', 'dark blue'),
+    ('white', 'black', 'black on white'),
+    ('white', 'orange', 'orange on white'),
+    ('white', 'dark grey', 'dark grey on white'),
+    ('white', 'dark blue', 'dark blue on white'),
+    ('white', 'crimson', 'crimson on white'),
+    ('white', 'teal', 'teal on white'),
+    ('white', 'purple', 'purple on white'),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', ''),
+    # ('', '', '')
+       
 ]
 
 def setup_game_env():

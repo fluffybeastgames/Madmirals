@@ -1,11 +1,43 @@
 import random
 import tkinter as tk 
 from tkinter import ttk
+from tkinter import colorchooser
 from functools import partial
 from PIL import Image
 
 ### Project modules
 from constants import *
+
+def is_color_dark(color):
+    # Expects a hex color in format #FF00FF
+    r_val = int(color[1:3], base=16)
+    g_val = int(color[1:3], base=16)
+    b_val = int(color[1:3], base=16)
+    
+    # # Simpler approach Calculate brightness..
+    brightness = (r_val*299 + g_val*587 + b_val*114)/1000 # these seemingly arbitrary values have been used in other functions in other languages
+    # return brightness < 185 # threshold can be varied
+
+    # more sophisticatred - calculate luminance
+    r2 = r_val/255.0
+    if r2 <= 0.04045: r2 =  r2/12.92
+    else: r2 = ((r2+0.055)/1.055) ** 2.4
+
+    g2 = g_val/255.0
+    if g2 <= 0.04045: g2 =  g2/12.92
+    else: g2 = ((g2+0.055)/1.055) ** 2.4
+    
+    b2 = b_val/255.0
+    if b2 <= 0.04045: b2 =  b2/12.92
+    else: b2 = ((b2+0.055)/1.055) ** 2.4
+    
+    luminance = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2
+    
+    print(f'Color {color} has a brightness of {brightness} and luminance of {luminance}')
+    return luminance < .179 # threshold of 179 is defined by W3C reccomendation
+
+
+
 
 class MadmiralsGUI:
 
@@ -65,8 +97,6 @@ class MadmiralsGUI:
     # class Scoreboard:
     #     pass 
 
-    # class SettingsWindow(top):
-    #     pass 
 
     # class 
 
@@ -252,139 +282,227 @@ class MadmiralsGUI:
 
         self.parent.create_new_replay_game(game_id=game_id)     
 
+    
     def open_game_settings(self, event=None):
-        # print(self.settings_window)
-        # if self.settings_window is not None:
-        #     pass
-        # else:
-            self.settings_window = tk.Toplevel(self.root)
-            # self.settings_window.geometry('500x550')
-            self.settings_window.title('New Game Settings')
-            lbl_header = tk.Label(self.settings_window, text= 'Game Settings', font=('Helvetica 10 bold'))
-            lbl_player = tk.Label(self.settings_window, text= 'Player Name:', font=('Helvetica 10 bold'))
-            lbl_bots = tk.Label(self.settings_window, text= 'Number of Bots:', font=('Helvetica 10 bold'))
-            lbl_rows = tk.Label(self.settings_window, text= 'Row Count:', font=('Helvetica 10 bold'))
-            lbl_cols = tk.Label(self.settings_window, text= 'Column Count:', font=('Helvetica 10 bold'))
-            lbl_seed = tk.Label(self.settings_window, text= 'Game Seed:', font=('Helvetica 10 bold'))
+        self.settings_window = self.SettingsWindow(self)
 
-
-            self.settings_window.val_bots = tk.DoubleVar()
-            self.settings_window.val_rows = tk.DoubleVar()
-            self.settings_window.val_cols = tk.DoubleVar()
+    class SettingsWindow:
+        def __init__(self, parent):
+            self.parent = parent 
+            self.top = tk.Toplevel(self.parent.root) 
+            self.top.title('New Game Settings')
+            self.f_gui = tk.Frame(self.top)
+            self.define_layout()
             
-            def slider_changed_bots(event):
-                self.settings_window.bots_rand_or_cust.set(USE_CUST)
+        def define_layout(self):            
+            lbl_header = tk.Label(self.f_gui, text='Game Settings', font=('Helvetica 10 bold'))
 
-            def slider_changed_rows(event):
-                self.settings_window.rows_rand_or_cust.set(USE_CUST)
+            #frame_player = self.get_frame_player()
+            self.frame_game = tk.Frame(self.f_gui, highlightbackground='black', highlightthickness=2)
+            self.frame_player = tk.Frame(self.f_gui, highlightbackground='black', highlightthickness=2)
+            self.frame_params = tk.Frame(self.f_gui, highlightbackground='black', highlightthickness=2)
+            self.frame_options = tk.Frame(self.f_gui, highlightbackground='black', highlightthickness=2)
+            
+            self.populate_frame_game()
+            self.populate_frame_player()
+            self.populate_frame_params()
+            self.populate_frame_options()
+                        
+            btn_ok = tk.Button(master=self.f_gui, text='OK', width=14, height=2, command=self.apply_settings, bg='light blue')
+            btn_cancel = tk.Button(self.f_gui, text='Cancel', width=14, height=2, command=self.cancel_settings, bg='light blue')
 
-            def slider_changed_cols(event):
-                self.settings_window.cols_rand_or_cust.set(USE_CUST)
+            lbl_header.grid(row=0, column=0, padx=10, pady=10)
+            
+            self.frame_game.grid(row=1, column=0, padx=10, pady=10, sticky='news')
+            self.frame_player.grid(row=1, column=1, padx=10, pady=10, sticky='news')
+            self.frame_params.grid(row=2, column=0, padx=10, pady=10, sticky='news')
+            self.frame_options.grid(row=2, column=1, padx=10, pady=10, sticky='news')
+            
+            btn_ok.grid(row=3, column=0, pady=10, stick='e')
+            btn_cancel.grid(row=3, column=1, pady=10, sticky='w')
 
-            self.settings_window.slider_bots = tk.Scale(
-                self.settings_window, orient='horizontal', showvalue=True,
-                variable=self.settings_window.val_bots, command=slider_changed_bots,
+            self.f_gui.pack()
+        
+        def populate_frame_player(self):
+            f = self.frame_player # convenience variable
+
+            self.player_name = tk.StringVar()
+            self.player_name.set('Namethy') # a random seed, same range as default 'New Game'
+            
+            lbl_player = tk.Label(f, text='Player', font=('Helvetica 10 bold'))
+            self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=20, bg='light green')
+    
+            # btn_generate_new_user = tk.Button(master=self.top, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
+            btn_player_color = tk.Button(f, text='Select Color', width=14, height=1, bg='light blue', command=self.prompt_for_user_color)
+            btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
+            
+            lbl_player.grid(row=0,column=0, padx=10, pady=(5,2), sticky='w')
+            self.player_name_entry.grid(row=1,column=0, padx=10, pady=(2,2), sticky='w')
+            btn_player_color.grid(row=1,column=1, padx=10, pady=(2,2))
+            btn_reset_color.grid(row=2,column=1, padx=10, pady=(2, 10))
+
+        def populate_frame_game(self):
+            f = self.frame_game
+
+            lbl_seed = tk.Label(f, text= 'Seed', font=('Helvetica 10 bold'))
+            f.new_seed = tk.StringVar()
+            f.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
+            seed_entry = tk.Entry(f, textvariable=f.new_seed, width=12)
+            btn_generate_new_seed = tk.Button(master=f, text='New Seed', width=14, height=1, highlightcolor='orange', command=self.generate_new_seed, bg='light blue')
+            
+            lbl_game_mode = tk.Label(f, text= 'Game Mode', font=('Helvetica 10 bold'))
+            avail_game_modes = [
+                'Free for All',
+                'Team Battle',
+                'Treasure Hunt',
+                'Conway\'s Game of Sealife',
+                'Friday'
+            ]
+
+            selected_game_mode = tk.StringVar()
+            selected_game_mode.set('Free for all')
+            dropdown_game_mode = tk.OptionMenu(f, selected_game_mode, *avail_game_modes)
+            dropdown_game_mode.config(width=25)
+            
+            lbl_game_mode.grid(row=0,column=0, sticky='w', padx=10, pady=(5,2))
+            dropdown_game_mode.grid(row=1, column=0, columnspan=2, sticky='w', padx=10, pady=(2,2))
+
+            lbl_seed.grid(row=2,column=0, sticky='w', padx=10, pady=(5,2))
+            seed_entry.grid(row=3,column=0, sticky='w', padx=10, pady=(2, 10))
+            btn_generate_new_seed.grid(row=3,column=1, sticky='w', padx=(2, 10), pady=(2, 10))
+            
+        def generate_new_seed(self):
+            self.frame_game.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
+
+        def populate_frame_params(self):
+            f = self.frame_params
+            lbl_bots = tk.Label(f, text= 'Opponents', font=('Helvetica 10 bold'))
+            lbl_rows = tk.Label(f, text= 'Game Board Width', font=('Helvetica 10 bold'))
+            lbl_cols = tk.Label(f, text= 'Game Board Height', font=('Helvetica 10 bold'))
+            
+            f.val_bots = tk.DoubleVar()
+            f.val_rows = tk.DoubleVar()
+            f.val_cols = tk.DoubleVar()
+
+            slider_bots = tk.Scale(
+                f, orient='horizontal', showvalue=True,
+                variable=f.val_bots, command=self.slider_changed_bots,
                 from_=MIN_BOTS, to=MAX_BOTS, troughcolor='blue', 
                 tickinterval=2, length=200, sliderlength=40
             )
-            self.settings_window.slider_rows = tk.Scale(
-                self.settings_window, orient='horizontal', showvalue=True,
-                variable=self.settings_window.val_rows, command=slider_changed_rows,
+            slider_rows = tk.Scale(
+                f, orient='horizontal', showvalue=True,
+                variable=f.val_rows, command=self.slider_changed_rows,
                 from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue', 
                 tickinterval=2, length=200, sliderlength=40
             )
-            self.settings_window.slider_cols = tk.Scale(
-                self.settings_window, orient='horizontal', showvalue=True,
-                variable=self.settings_window.val_cols, command=slider_changed_cols,
+            slider_cols = tk.Scale(
+                f, orient='horizontal', showvalue=True,
+                variable=f.val_cols, command=self.slider_changed_cols,
                 from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue',
                 tickinterval=2, length=200, sliderlength=40
-            )                
-
-            self.settings_window.bots_rand_or_cust = tk.IntVar()
-            self.settings_window.bots_rand_or_cust.set(USE_DEFAULT) 
-            self.settings_window.rand_bots = tk.Radiobutton(self.settings_window, variable=self.settings_window.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
-            self.settings_window.cust_bots = tk.Radiobutton(self.settings_window, variable=self.settings_window.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
+            )              
             
-            self.settings_window.rows_rand_or_cust = tk.IntVar()
-            self.settings_window.rows_rand_or_cust.set(USE_DEFAULT)
-            self.settings_window.rand_rows = tk.Radiobutton(self.settings_window, variable=self.settings_window.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
-            self.settings_window.cust_rows = tk.Radiobutton(self.settings_window, variable=self.settings_window.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
-            
-            self.settings_window.cols_rand_or_cust = tk.IntVar()
-            self.settings_window.cols_rand_or_cust.set(USE_DEFAULT)
-            self.settings_window.rand_cols = tk.Radiobutton(self.settings_window, variable=self.settings_window.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
-            self.settings_window.cust_cols = tk.Radiobutton(self.settings_window, variable=self.settings_window.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
-            
-            self.settings_window.new_seed = tk.StringVar()
-            self.settings_window.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
-            self.settings_window.seed_entry = tk.Entry(self.settings_window, textvariable=self.settings_window.new_seed, width=20)
+            f.bots_rand_or_cust = tk.IntVar()
+            f.bots_rand_or_cust.set(USE_DEFAULT) 
+            rand_bots = tk.Radiobutton(f, variable=f.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
+            cust_bots = tk.Radiobutton(f, variable=f.bots_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
 
-            def generate_new_seed():
-                self.settings_window.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
-
-            def generate_new_user():
-                print('TODO make new user! And also convert the user entry to a dropdown :)')
-
-            self.settings_window.btn_generate_new_seed = tk.Button(master=self.settings_window, text='New Seed', width=14, height=1, highlightcolor='orange', command=generate_new_seed, bg='light blue')
-            self.settings_window.btn_generate_new_user = tk.Button(master=self.settings_window, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
-
-            self.settings_window.player_name = tk.StringVar()
-            self.settings_window.player_name.set('Name') # a random seed, same range as default 'New Game'
-            self.settings_window.player_name_entry = tk.Entry(self.settings_window, textvariable=self.settings_window.player_name, width=20)
+            f.rows_rand_or_cust = tk.IntVar()
+            f.rows_rand_or_cust.set(USE_DEFAULT)
+            rand_rows = tk.Radiobutton(f, variable=f.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
+            cust_rows = tk.Radiobutton(f, variable=f.rows_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
             
-            def okthen():
-                print('okey')
-                # Validate input; if valid, create a new instance of game with the passed params then kill this window
+            f.cols_rand_or_cust = tk.IntVar()
+            f.cols_rand_or_cust.set(USE_DEFAULT)
+            rand_cols = tk.Radiobutton(f, variable=f.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_DEFAULT, text='Random')
+            cust_cols = tk.Radiobutton(f, variable=f.cols_rand_or_cust, justify=tk.LEFT, anchor='w', value=USE_CUST, text='')
             
-                num_players = int((self.settings_window.val_bots.get()+1)) if self.settings_window.bots_rand_or_cust.get() == USE_CUST else None
-                num_rows = int(self.settings_window.val_rows.get()) if self.settings_window.rows_rand_or_cust.get() == USE_CUST else None
-                num_cols = int(self.settings_window.val_cols.get()) if self.settings_window.cols_rand_or_cust.get() == USE_CUST else None
+            lbl_bots.grid(row=10, column=0, columnspan=2, sticky='w', padx=10, pady=(5,0))
+            rand_bots.grid(row=11, column=0, sticky='w', padx=(15,5))
+            cust_bots.grid(row=11, column=1, sticky='w', padx=(2,0))
+            slider_bots.grid(row=11, column=2, sticky='w', padx=(0,10), pady=(20,0))
+
+            lbl_rows.grid(row=20, column=0, columnspan=2, sticky='w', padx=10, pady=(5,0))
+            rand_rows.grid(row=21, column=0, sticky='w', padx=(15,5))
+            cust_rows.grid(row=21, column=1, sticky='w', padx=(2,0))
+            slider_rows.grid(row=21, column=2, sticky='w', padx=(0,10), pady=(20,0))
+            
+            lbl_cols.grid(row=30, column=0, columnspan=2, sticky='w', padx=10, pady=(5,0))
+            rand_cols.grid(row=31,column=0, sticky='w', padx=(15,5))
+            cust_cols.grid(row=31, column=1, sticky='w', padx=(2,0))
+            slider_cols.grid(row=31, column=2, sticky='w', padx=(0,10), pady=(20,0))
+            
+
+        def slider_changed_bots(self, event):
+            self.frame_params.bots_rand_or_cust.set(USE_CUST)
+
+        def slider_changed_rows(self, event):
+            self.frame_params.rows_rand_or_cust.set(USE_CUST)
+
+        def slider_changed_cols(self, event):
+            self.frame_params.cols_rand_or_cust.set(USE_CUST)
+
+
+        def populate_frame_options(self):
+            f = self.frame_options
+            
+            print('TODO one more frame here')
+            
+        
+        # def generate_new_user():
+        #     print('TODO make new user! And also convert the user entry to a dropdown :)')
+
+        
+        
+        def prompt_for_user_color(self):
+            # Bring up a color picker window. If the user picks a color, check whether fg should be black or white
+            # if they cancel, revert to the 'random' default for currently displayed seed
+            c_code = colorchooser.askcolor()
+            print(c_code)
+            if c_code is None or c_code[0] is None:
+                self.top.btn_player_color.config(bg='light grey')
+            else:
+                bg = c_code[1]
+                fg = 'white' if is_color_dark(bg) else 'black'
+                self.player_name_entry.config(bg=bg, fg=fg) #TODO HERE MOVE THIS ENTRY TO settingdwindow
+
+                # print(is_color_dark(c_code[1]))
+
+
+        def reset_user_color(self):
+            # Reverts the user color to the one generated by the current seed
+            #TODO
+            
+            self.player_name_entry.config(bg='white', fg='blue')
+
+                # print(is_color_dark(c_code[1]))                
                 
-                new_seed_text = self.settings_window.new_seed.get()
-                if new_seed_text.isdigit() and (int(new_seed_text)>0):
-                    seed = int(new_seed_text)
-                else:
-                    seed = None 
+        def apply_settings(self):
+            # Validate input; if valid, create a new instance of game with the passed params then kill this window
 
-                self.parent.create_new_game(num_rows, num_cols, num_players, seed, game_mode=GAME_MODE_FFA_CUST)
-                
-                self.settings_window.destroy()
-                # self.settings_window = None
+            num_players = int((self.frame_params.val_bots.get()+1)) if self.frame_params.bots_rand_or_cust.get() == USE_CUST else None
+            num_rows = int(self.frame_params.val_rows.get()) if self.frame_params.rows_rand_or_cust.get() == USE_CUST else None
+            num_cols = int(self.frame_params.val_cols.get()) if self.frame_params.cols_rand_or_cust.get() == USE_CUST else None
+            
+            player_color = None
+            new_seed_text = self.frame_game.new_seed.get()
+            if new_seed_text.isdigit() and (int(new_seed_text)>0):
+                seed = int(new_seed_text)
+            else:
+                seed = None 
+
+            self.parent.parent.create_new_game(num_rows, num_cols, num_players, seed, game_mode=GAME_MODE_FFA_CUST, player_color=player_color)
+            
+            self.top.destroy()
+            # self.top = None
 
 
-            def okcancel():
-                self.settings_window.destroy()
-                # self.settings_window = None
-                
-            self.settings_window.btn_ok = tk.Button(master=self.settings_window, text='OK', width=14, height=3, highlightcolor='orange', command=okthen, bg='light blue')
-            self.settings_window.btn_cancel = tk.Button(self.settings_window, text='Cancel', width=14, height=3, highlightcolor='orange', command=okcancel, bg='light blue')
-            
-            # Layout 
-            lbl_header.grid(row=0, column=0, columnspan=4)
-            
-            lbl_player.grid(row=10, column=0)
-            self.settings_window.player_name_entry.grid(row=10, column=2, columnspan=3, sticky='w')
-            self.settings_window.btn_generate_new_user.grid(row=10,column=4, columnspan=2, sticky='w')
-            
-            lbl_bots.grid(row=30,column=0, sticky='e', padx=(10,0))
-            lbl_rows.grid(row=31,column=0, sticky='e', padx=(10,0))
-            lbl_cols.grid(row=32,column=0, sticky='e', padx=(10,0))
-            self.settings_window.rand_bots.grid(row=30,column=2, sticky='w')
-            self.settings_window.rand_rows.grid(row=31,column=2, sticky='w')
-            self.settings_window.rand_cols.grid(row=32,column=2, sticky='w')
-            self.settings_window.cust_bots.grid(row=30,column=3, sticky='w')
-            self.settings_window.cust_rows.grid(row=31,column=3, sticky='w')
-            self.settings_window.cust_cols.grid(row=32,column=3, sticky='w')                        
-            self.settings_window.slider_bots.grid(row=30,column=4, sticky='w', padx=(0,10))
-            self.settings_window.slider_rows.grid(row=31,column=4, sticky='w', padx=(0,10))
-            self.settings_window.slider_cols.grid(row=32,column=4, sticky='w', padx=(0,10))
-            
-            lbl_seed.grid(row=40,column=0, sticky='w')
-            self.settings_window.seed_entry.grid(row=40,column=2, columnspan=2, sticky='w')
-            self.settings_window.btn_generate_new_seed.grid(row=40,column=4, columnspan=2, sticky='w')
-            
-            self.settings_window.btn_ok.grid(row=50,column=2, pady=10)
-            self.settings_window.btn_cancel.grid(row=50,column=4, pady=10)
+        def cancel_settings(self):
+            self.top.destroy()
+            # self.top = None
+                    
+
 
     def populate_game_board_frame(self):
         if not self.frame_game_board is None: self.frame_game_board.destroy()
@@ -410,11 +528,11 @@ class MadmiralsGUI:
         
         # canvas.config(width=250,height=250)
 
- #yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
-        #canvas.configure(scrollregion=canvas.bbox("all"))
-# canvas.config(width=300,height=300)
-# canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
-# canvas.pack(side=LEFT,expand=True,fill=BOTH)
+        #yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
+                #canvas.configure(scrollregion=canvas.bbox("all"))
+        # canvas.config(width=300,height=300)
+        # canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
+        # canvas.pack(side=LEFT,expand=True,fill=BOTH)
 
         # canvas = Canvas(root, scrollregion=(0, 0, 1000, 1000), yscrollcommand=v.set, xscrollcommand=h.set)
         # h['command'] = canvas.xview
@@ -448,24 +566,6 @@ class MadmiralsGUI:
         self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=15, padx=(15, 15))
         self.frame_game_board.focus_set()
 
-    def populate_win_conditions_frame(self):
-        if not self.frame_win_conditions is None:
-            self.frame_win_conditions.destroy()
-
-        self.frame_win_conditions = tk.Frame(master=self.root)
-
-        self.lbl_win_header = tk.Label(master=self.frame_win_conditions, text='Win Conditions', font=('Arial 22 bold'))
-        self.lbl_win_desc = tk.Label(master=self.frame_win_conditions, text='Capture all Admiral cells', font=('Arial 18 bold'))
-        
-        self.lbl_lose_header = tk.Label(master=self.frame_win_conditions, text='Lose Conditions', font=('Arial 22 bold'))
-        self.lbl_lose_desc = tk.Label(master=self.frame_win_conditions, text='Troop count reaches 0', font=('Arial 18 bold'))
-        
-        self.lbl_win_header.grid(row=0, column=0)
-        self.lbl_win_desc.grid(row = 1, column = 0)
-        self.lbl_lose_header.grid(row=2, column=0)
-        self.lbl_lose_desc.grid(row = 3, column = 0)
-        self.frame_win_conditions.grid(row=1, column=9, sticky='n',  pady=(0, 0), padx=(15,15))
-        
     def populate_scoreboard_frame(self):
         if not self.frame_scoreboard is None:
             self.frame_scoreboard.destroy()
@@ -488,9 +588,8 @@ class MadmiralsGUI:
             if len(self.parent.game.players[i].user_desc) > name_label_width:
                 name_label_width = min(len(self.parent.game.players[i].user_desc), SCORE_BOARD_WIDTH_NAME_MAX)
 
-        print(f'Decided on a scoreboard width of {name_label_width}')
+        # print(f'Decided on a scoreboard width of {name_label_width}')
             
-
         ROW_OFFSET = 2
         for i in range(self.parent.game.num_players):
             self.bg_frames.append(tk.Frame(master=self.frame_scoreboard))
@@ -510,39 +609,30 @@ class MadmiralsGUI:
 
         self.frame_scoreboard.grid(row=0, column=9, sticky='n', pady=(15, 0), padx=(15,15), ipady=5)
     
+    def populate_win_conditions_frame(self):
+        if not self.frame_win_conditions is None:
+            self.frame_win_conditions.destroy()
 
-    # def populate_scoreboard_frame(self):
-    #     if not self.frame_scoreboard is None:
-    #         self.frame_scoreboard.destroy()
-    #     self.frame_scoreboard = tk.Frame(master=self.root, highlightbackground='black', highlightthickness=5)
-    #     self.lbl_header = tk.Label(master=self.frame_scoreboard, text='Scoreboard', font=('Arial 22 bold'))
-    #     self.lbl_header.grid(row=0, column=0, columnspan=3, sticky='N')
+        self.frame_win_conditions = tk.Frame(master=self.root, highlightbackground='black', highlightthickness=3)
 
-    #     self.lbl_turn_count = tk.Label(master=self.frame_scoreboard, text='Turn 0', font=('Arial 18 bold'))
-    #     self.lbl_turn_count.grid(row = 1, column = 0)
-
-    #     self.lbls_name = []
-    #     self.lbls_cells = []
-    #     self.lbls_troops = []
-
-    #     ROW_OFFSET = 2
-    #     for i in range(self.parent.game.num_players):
-    #         self.lbls_name.append(tk.Label(master=self.frame_scoreboard, text=f'player {i}', width=20, font=('Arial 16 bold')))
-    #         self.lbls_cells.append(tk.Label(master=self.frame_scoreboard, text=f'cells {i}', width=5, font=('Arial 16 bold')))
-    #         self.lbls_troops.append(tk.Label(master=self.frame_scoreboard, text=f'troops {i}', width=10, font=('Arial 16 bold')))
-
-    #         self.lbls_name[i].grid_propagate(0)
-    #         self.lbls_cells[i].grid_propagate(0)
-    #         self.lbls_troops[i].grid_propagate(0)
-            
-
-    #         self.lbls_name[i].grid(row=i + ROW_OFFSET, column=0, sticky='ew')
-    #         self.lbls_cells[i].grid(row=i + ROW_OFFSET, column=1, sticky='ew')
-    #         self.lbls_troops[i].grid(row=i + ROW_OFFSET, column=2, sticky='ew')
-
-    #     self.frame_scoreboard.grid(row=0, column=9, sticky='n', pady=(30, 0), padx=(15,45))
+        self.lbl_win_header = tk.Label(master=self.frame_win_conditions, text='Win Conditions', font=('Arial 22 bold'))
+        self.lbl_win_desc = tk.Label(master=self.frame_win_conditions, text='Capture all Admiral cells', font=('Arial 18 bold'))
+        
+        self.lbl_lose_header = tk.Label(master=self.frame_win_conditions, text='Lose Conditions', font=('Arial 22 bold'))
+        self.lbl_lose_desc = tk.Label(master=self.frame_win_conditions, text='Troop count reaches 0', font=('Arial 18 bold'))
+        
+        self.lbl_win_header.grid(row=0, column=0)
+        self.lbl_win_desc.grid(row = 1, column = 0)
+        self.lbl_lose_header.grid(row=2, column=0)
+        self.lbl_lose_desc.grid(row = 3, column = 0)
+        self.frame_win_conditions.grid(row=1, column=9, sticky='n',  pady=(0, 0), padx=(15,15))
     
+    #def populate_tide_frame(self):
+
+
     def render(self):  
+        tide = self.parent.game.get_tide()
+
         if self.parent.game is not None:          
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
@@ -561,11 +651,22 @@ class MadmiralsGUI:
                                 bg_color = 'dark grey'
                                 fg_color = 'black'
                             elif cell_type == CELL_TYPE_SWAMP:
-                                bg_color = 'green'
-                                fg_color = 'dark grey'
+                                if tide == TIDE_HIGH:
+                                    bg_color = 'dark blue'
+                                    fg_color = 'white'
+                                else:
+                                    bg_color = 'green'
+                                    fg_color = 'dark grey'
                             else:
-                                bg_color = 'light blue'
-                                fg_color = 'dark grey'
+                                if tide == TIDE_HIGH:
+                                    bg_color = 'dark blue'
+                                    fg_color = 'white'
+                                elif tide == TIDE_LOW:
+                                    bg_color = 'light blue'
+                                    fg_color = 'dark grey'                                
+                                elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
+                                    bg_color = 'blue'
+                                    fg_color = 'white'
 
                         else:
                             bg_color = self.parent.game.players[uid].color_bg

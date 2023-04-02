@@ -54,14 +54,15 @@ class MadmiralsGameManager:
         self.game_loop() # start the game cycle!
          
 
-    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None):
+    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None):
         print('create_new_game')
 
-        self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players)
+        self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players, player_color=player_color)
         
         self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
         self.gui.populate_win_conditions_frame()
+###        self.gui.populate_tide_frame()
         
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
