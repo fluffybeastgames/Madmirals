@@ -15,7 +15,7 @@ from seedy import Seedling #
 
 class MadmiralsGameInstance:
     
-    def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None):
+    def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None, player_color=None):
         self.parent = parent
         
         self.seed = seed # the world seed used for generating the level
@@ -28,9 +28,15 @@ class MadmiralsGameInstance:
         self.game_status = GAME_STATUS_INIT
         self.turn = 0
 
+        self.high_tide_duration = 20
+        self.retreating_tide_duration = 10
+        self.low_tide_duration = 20
+        self.incoming_duration = 10
+        
         self.num_rows = num_rows # either a predefined integer value (preferably higher than 5) or None. 
         self.num_cols = num_cols #      If it's None, a pseudo-random value will be assigned in 
         self.num_players = num_players
+        self.player_color = player_color # if not none, override the default seed's color for the player TODO implement downstream from here
 
         self.active_cell = None # cell address 
 
@@ -54,6 +60,23 @@ class MadmiralsGameInstance:
         else:
             self.add_game_to_log()
             self.record_starting_conditions()
+
+    def get_tide(self):
+        full_tide_cycle_length = self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration
+        tide_no = self.turn % full_tide_cycle_length
+
+        if tide_no < self.high_tide_duration:
+            return TIDE_HIGH
+        elif  tide_no < self.high_tide_duration + self.retreating_tide_duration:
+            return TIDE_GOING_OUT
+        elif  tide_no < self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration:
+            return TIDE_LOW
+        elif  tide_no < self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration:
+            return TIDE_COMING_IN
+        else:
+            raise ValueError('I do not think this is going to trigger')
+        
+        
 
     def closest_instance_of_entity(self, entity_type, starting_cell):
         MAX_SEARCH_DEPTH = 3  # temp, should line up w/ user input
@@ -925,7 +948,8 @@ class MadmiralsGameInstance:
             else:
                 self.hidden = True             
         
-        def update_display_text(self):
+        def update_display_text(self): # TODO fix this - move it to gui and / or make it automatic
+            tide = self.parent.get_tide()
             str_troops = self.troops if self.troops > 0 else ''
             
             if self.hidden:
@@ -936,7 +960,7 @@ class MadmiralsGameInstance:
                             self.display_text.set('A')  
                     elif self.cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
                         self.display_text.set('M')
-                    elif self.cell_type == CELL_TYPE_SWAMP:
+                    elif self.cell_type == CELL_TYPE_SWAMP and tide != TIDE_HIGH:
                         self.display_text.set('S')
                     else:
                         self.display_text.set('')
@@ -958,7 +982,10 @@ class MadmiralsGameInstance:
                 elif self.cell_type == CELL_TYPE_MOUNTAIN_BROKEN:
                     self.display_text.set(f'~{str_troops}')
                 elif self.cell_type == CELL_TYPE_SWAMP:
-                    self.display_text.set(f'S{str_troops}')
+                    if tide == TIDE_HIGH:
+                        self.display_text.set(f'{str_troops}')
+                    else:
+                        self.display_text.set(f'S{str_troops}')
 
                 else:
                     self.display_text.set(f'{str_troops}')  

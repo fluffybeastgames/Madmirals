@@ -12,13 +12,13 @@ class MadDBConnection:
         self.cur.execute('CREATE TABLE log_game_entities(game_entity_id INTEGER NOT NULL PRIMARY KEY, game_id INTEGER, player_id INTEGER, player_name TEXT, bg TEXT, fg TEXT)')
         self.cur.execute('CREATE TABLE players(player_id INTEGER NOT NULL PRIMARY KEY, player_name TEXT, creation_date TEXT)')
         self.cur.execute('CREATE TABLE bot_names(bot_name_id INTEGER PRIMARY KEY, bot_name TEXT)')
-        self.cur.execute('CREATE TABLE entity_colors(entity_color_id INTEGER NOT NULL PRIMARY KEY, bg_color TEXT, fg_color TEXT)')
+        self.cur.execute('CREATE TABLE entity_colors(entity_color_id INTEGER NOT NULL PRIMARY KEY, bg_color TEXT, fg_color TEXT, description TEXT)')
         self.cur.execute('CREATE TABLE user_settings(user_id INTEGER NOT NULL PRIMARY KEY, profile_desc TEXT, player_id INTEGER, default_language TEXT)')
 
         # Seed the bot names and color tables with a default list of options. 
         # TODO add the ability for users to customize their lists
         self.cur.executemany("INSERT INTO bot_names (bot_name) VALUES(?)", default_bot_names)
-        self.cur.executemany("INSERT INTO entity_colors (bg_color, fg_color) VALUES(?, ?)", default_colors)
+        self.cur.executemany("INSERT INTO entity_colors (bg_color, fg_color, description) VALUES(?, ?, ?)", default_colors)
         self.con.commit() 
     
     def run_sql(self, sql, vals=None, execute_many=False, commit=True):
