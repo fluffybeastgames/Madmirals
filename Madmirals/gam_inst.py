@@ -15,7 +15,7 @@ from seedy import Seedling #
 
 class MadmiralsGameInstance:
     
-    def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None, player_color=None):
+    def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None, player_color=None, player_name=None):
         self.parent = parent
         
         self.seed = seed # the world seed used for generating the level
@@ -32,12 +32,14 @@ class MadmiralsGameInstance:
         self.retreating_tide_duration = 10
         self.low_tide_duration = 20
         self.incoming_duration = 10
+
+        self.player_color = player_color # if not none, override the default seed's color for the player TODO implement downstream from here
+        self.player_name = player_name
         
         self.num_rows = num_rows # either a predefined integer value (preferably higher than 5) or None. 
         self.num_cols = num_cols #      If it's None, a pseudo-random value will be assigned in 
         self.num_players = num_players
-        self.player_color = player_color # if not none, override the default seed's color for the player TODO implement downstream from here
-
+        
         self.active_cell = None # cell address 
 
         self.players = {} # contains the player objects w/ numeric id
@@ -190,13 +192,27 @@ class MadmiralsGameInstance:
         list_avail_colors = self.parent.db.run_sql_select(sql_colors, num_vals_selected=2)
 
         for i in range(self.num_players):
+            player_id = i
+            
             user_desc = list_avail_names.pop(self.seed*123 % len(list_avail_names))
             user_colors = list_avail_colors.pop(self.seed*33 % len(list_avail_colors))
             
             bg = user_colors[0]
             fg = user_colors[1]
 
-            player_id = i
+            if player_id == 0: # ie the player
+                if self.player_color is not None:
+                    bg = self.player_color[0]
+                    fg = self.player_color[1]
+
+                if self.player_name is not None:
+                    user_desc = self.player_name
+                    
+            # # dev bonus
+            # if p == 0: 
+            #     #target_cell.troops = 255 #500
+            #     self.players[p].user_desc = 'Zeke'
+            #     player_name
 
             bot_behavior = None
             if i > 0:    
@@ -294,11 +310,7 @@ class MadmiralsGameInstance:
             target_cell.owner = self.players[p].user_id
             target_cell.cell_type = CELL_TYPE_ADMIRAL
             target_cell.troops = 10 # consider playing w/ starting troops
-            
-            # dev bonus
-            if p == 0: 
-                #target_cell.troops = 255 #500
-                self.players[p].user_desc = 'Zeke'
+
 
     def add_game_to_log(self):
         # Add an entry to the database for this game

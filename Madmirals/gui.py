@@ -284,6 +284,9 @@ class MadmiralsGUI:
 
     
     def open_game_settings(self, event=None):
+        if self.parent.game is not None and self.parent.game.game_status == GAME_STATUS_IN_PROGRESS:
+            self.parent.game.game_status = GAME_STATUS_PAUSE
+
         self.settings_window = self.SettingsWindow(self)
 
     class SettingsWindow:
@@ -293,6 +296,7 @@ class MadmiralsGUI:
             self.top.title('New Game Settings')
             self.f_gui = tk.Frame(self.top)
             self.define_layout()
+            
             
         def define_layout(self):            
             lbl_header = tk.Label(self.f_gui, text='Game Settings', font=('Helvetica 10 bold'))
@@ -322,24 +326,6 @@ class MadmiralsGUI:
             btn_cancel.grid(row=3, column=1, pady=10, sticky='w')
 
             self.f_gui.pack()
-        
-        def populate_frame_player(self):
-            f = self.frame_player # convenience variable
-
-            self.player_name = tk.StringVar()
-            self.player_name.set('Namethy') # a random seed, same range as default 'New Game'
-            
-            lbl_player = tk.Label(f, text='Player', font=('Helvetica 10 bold'))
-            self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=20, bg='light green')
-    
-            # btn_generate_new_user = tk.Button(master=self.top, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
-            btn_player_color = tk.Button(f, text='Select Color', width=14, height=1, bg='light blue', command=self.prompt_for_user_color)
-            btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
-            
-            lbl_player.grid(row=0,column=0, padx=10, pady=(5,2), sticky='w')
-            self.player_name_entry.grid(row=1,column=0, padx=10, pady=(2,2), sticky='w')
-            btn_player_color.grid(row=1,column=1, padx=10, pady=(2,2))
-            btn_reset_color.grid(row=2,column=1, padx=10, pady=(2, 10))
 
         def populate_frame_game(self):
             f = self.frame_game
@@ -373,12 +359,77 @@ class MadmiralsGUI:
             
         def generate_new_seed(self):
             self.frame_game.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
+            # Update the slider values of row/col/bots if they're set to random
+            # Update player color if they haven't set it yet
+
+
+        def populate_frame_player(self):
+            f = self.frame_player # convenience variable
+            self.player_name = tk.StringVar()
+
+            if self.parent.parent.game is not None and self.parent.parent.game.player_name is not None:
+                self.player_name.set(self.parent.parent.game.player_name )
+            else:
+                self.player_name.set('Some Square') # a random seed, same range as default 'New Game'
+            
+            self.player_has_set_a_custom_color = False
+            self.player_color_bg = tk.StringVar()
+            self.player_color_fg = tk.StringVar()
+            
+   
+
+            lbl_player = tk.Label(f, text='Player', font=('Helvetica 10 bold'))
+            self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=25, bg='light green', font=('Arial 16 bold'))
+    
+            # btn_generate_new_user = tk.Button(master=self.top, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
+            btn_player_color = tk.Button(f, text='Select Color', width=14, height=1, bg='light blue', command=self.prompt_for_user_color)
+            btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
+            
+            lbl_player.grid(row=0,column=0, padx=10, pady=(5,2), sticky='w')
+            self.player_name_entry.grid(row=1,column=0, padx=10, pady=(2,2), sticky='w')
+            btn_player_color.grid(row=1,column=1, padx=10, pady=(2,2))
+            btn_reset_color.grid(row=2,column=1, padx=10, pady=(2, 10))
+
+               
+        def prompt_for_user_color(self):
+            # Bring up a color picker window. If the user picks a color, check whether fg should be black or white
+            # if they cancel, revert to the 'random' default for currently displayed seed
+            c_code = colorchooser.askcolor()
+            print(c_code)
+            if c_code is not None and c_code[0] is not None:
+                bg = c_code[1]
+                fg = 'white' if is_color_dark(bg) else 'black'
+                
+                self.player_color_bg.set(bg) # we will grab this value on apply settings
+                self.player_color_fg.set(fg)
+
+                self.player_name_entry.config(bg=bg, fg=fg) #TODO HERE MOVE THIS ENTRY TO settingdwindow
+                self.player_has_set_a_custom_color = True
+                
+                # print(is_color_dark(c_code[1]))
+
+
+        def reset_user_color(self):
+            # Reverts the user color to the one generated by the current seed
+            #TODO
+
+            bg = 'white'
+            fg = 'dark blue'
+            
+            self.player_color_bg.set(bg) # we will grab this value on apply settings
+            self.player_color_fg.set(fg)
+
+            self.player_name_entry.config(bg=bg, fg=fg)
+            self.player_has_set_a_custom_color = False
+
+                # print(is_color_dark(c_code[1]))                
+
 
         def populate_frame_params(self):
             f = self.frame_params
             lbl_bots = tk.Label(f, text= 'Opponents', font=('Helvetica 10 bold'))
-            lbl_rows = tk.Label(f, text= 'Game Board Width', font=('Helvetica 10 bold'))
-            lbl_cols = tk.Label(f, text= 'Game Board Height', font=('Helvetica 10 bold'))
+            lbl_rows = tk.Label(f, text= 'Game Board Height', font=('Helvetica 10 bold'))
+            lbl_cols = tk.Label(f, text= 'Game Board Width', font=('Helvetica 10 bold'))
             
             f.val_bots = tk.DoubleVar()
             f.val_rows = tk.DoubleVar()
@@ -452,31 +503,7 @@ class MadmiralsGUI:
         
         # def generate_new_user():
         #     print('TODO make new user! And also convert the user entry to a dropdown :)')
-
         
-        
-        def prompt_for_user_color(self):
-            # Bring up a color picker window. If the user picks a color, check whether fg should be black or white
-            # if they cancel, revert to the 'random' default for currently displayed seed
-            c_code = colorchooser.askcolor()
-            print(c_code)
-            if c_code is None or c_code[0] is None:
-                self.top.btn_player_color.config(bg='light grey')
-            else:
-                bg = c_code[1]
-                fg = 'white' if is_color_dark(bg) else 'black'
-                self.player_name_entry.config(bg=bg, fg=fg) #TODO HERE MOVE THIS ENTRY TO settingdwindow
-
-                # print(is_color_dark(c_code[1]))
-
-
-        def reset_user_color(self):
-            # Reverts the user color to the one generated by the current seed
-            #TODO
-            
-            self.player_name_entry.config(bg='white', fg='blue')
-
-                # print(is_color_dark(c_code[1]))                
                 
         def apply_settings(self):
             # Validate input; if valid, create a new instance of game with the passed params then kill this window
@@ -485,20 +512,27 @@ class MadmiralsGUI:
             num_rows = int(self.frame_params.val_rows.get()) if self.frame_params.rows_rand_or_cust.get() == USE_CUST else None
             num_cols = int(self.frame_params.val_cols.get()) if self.frame_params.cols_rand_or_cust.get() == USE_CUST else None
             
-            player_color = None
+            player_color = (self.player_color_bg.get(), self.player_color_fg.get()) if self.player_has_set_a_custom_color else None
+            player_name = self.player_name.get()
+            
             new_seed_text = self.frame_game.new_seed.get()
             if new_seed_text.isdigit() and (int(new_seed_text)>0):
                 seed = int(new_seed_text)
             else:
                 seed = None 
 
-            self.parent.parent.create_new_game(num_rows, num_cols, num_players, seed, game_mode=GAME_MODE_FFA_CUST, player_color=player_color)
+            self.parent.parent.create_new_game(num_rows, num_cols, num_players, seed, game_mode=GAME_MODE_FFA_CUST, player_color=player_color, player_name=player_name)
             
+
+
             self.top.destroy()
             # self.top = None
 
 
         def cancel_settings(self):
+            if self.parent.parent.game is not None and self.parent.parent.game.game_status == GAME_STATUS_PAUSE:
+                self.parent.parent.game.game_status = GAME_STATUS_IN_PROGRESS
+
             self.top.destroy()
             # self.top = None
                     
@@ -652,20 +686,26 @@ class MadmiralsGUI:
                                 fg_color = 'black'
                             elif cell_type == CELL_TYPE_SWAMP:
                                 if tide == TIDE_HIGH:
-                                    bg_color = 'dark blue'
+                                    bg_color = COLOR_TIDE_HIGH
                                     fg_color = 'white'
+                                elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
+                                    bg_color = COLOR_SWAMP_MID_TIDE
+                                    fg_color = 'white'                                    
                                 else:
-                                    bg_color = 'green'
+                                    bg_color = COLOR_SWAMP
                                     fg_color = 'dark grey'
+                            elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN and tide == COLOR_TIDE_HIGH:
+                                bg_color = 'dark grey'
+                                fg_color = 'black'
                             else:
                                 if tide == TIDE_HIGH:
-                                    bg_color = 'dark blue'
+                                    bg_color = COLOR_TIDE_HIGH
                                     fg_color = 'white'
                                 elif tide == TIDE_LOW:
-                                    bg_color = 'light blue'
+                                    bg_color = COLOR_TIDE_LOW
                                     fg_color = 'dark grey'                                
                                 elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
-                                    bg_color = 'blue'
+                                    bg_color = COLOR_TIDE_RISING_3
                                     fg_color = 'white'
 
                         else:

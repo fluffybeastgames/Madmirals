@@ -54,10 +54,10 @@ class MadmiralsGameManager:
         self.game_loop() # start the game cycle!
          
 
-    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None):
+    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None, player_name=None):
         print('create_new_game')
 
-        self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players, player_color=player_color)
+        self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players, player_color=player_color, player_name=player_name)
         
         self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
