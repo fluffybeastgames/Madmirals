@@ -42,6 +42,7 @@ class MadmiralsGameManager:
         
         self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
+        self.gui.populate_tide_frame()
         self.gui.populate_win_conditions_frame()
         
         self.last_turn_timestamp = time.time()
@@ -61,6 +62,8 @@ class MadmiralsGameManager:
         
         self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
+        self.gui.populate_tide_frame()
+        
         self.gui.populate_win_conditions_frame()
 ###        self.gui.populate_tide_frame()
         

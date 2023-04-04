@@ -69,6 +69,81 @@ class MadmiralsGameInstance:
         else:
             self.add_game_to_log()
             self.record_starting_conditions()
+    
+    def get_tide_string(self, val):
+        if val == TIDE_HIGH:
+            return 'High'
+        elif val == TIDE_LOW:
+            return 'Low'
+        elif val == TIDE_GOING_OUT:
+            return 'Going Out'
+        elif val == TIDE_COMING_IN:
+            return 'Coming In'
+        else:
+            raise ValueError
+        
+    def get_tide_frame_info(self):
+        full_tide_cycle_length = self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration
+        tide_no = self.turn % full_tide_cycle_length
+
+        tide = 'tbd'
+        next_tide = 'tbd2'
+        next_tide_time = '2222'
+        later_tide = 'tbd3'
+        later_tide_time = '333'
+        bg_color = '#FFFFFF'
+
+
+        if tide_no < self.high_tide_duration:
+            tide = 'High'
+            next_tide = 'Going out'
+            next_tide_time = -1*(tide_no - self.high_tide_duration)
+            later_tide = 'Low'
+            later_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration)
+            bg_color = COLOR_TIDE_HIGH
+
+        elif  tide_no < self.high_tide_duration + self.retreating_tide_duration:
+            tide = 'Going Out'
+            next_tide = 'Low'
+            next_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration)
+            later_tide = 'Coming In'
+            later_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration - self.low_tide_duration)
+            bg_color = COLOR_TIDE_RISING_3
+
+
+        elif  tide_no < self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration:
+            tide = 'Low'
+            next_tide = 'Coming In'
+            next_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration - self.low_tide_duration)
+            later_tide = 'High'
+            later_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration - self.low_tide_duration - self.incoming_duration)
+            bg_color = COLOR_TIDE_LOW
+
+        elif  tide_no < self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration:
+            tide = 'Coming In'
+            next_tide = 'High'
+            next_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration - self.low_tide_duration)
+            later_tide = 'Going Out'
+            later_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration - self.low_tide_duration)
+            bg_color = COLOR_TIDE_RISING_3
+
+        #     = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration + self.low_tide_duration)
+
+        #     later_tide = 'Coming In'
+        #     #next_tide_time = -1*(tide_no - self.high_tide_duration - self.retreating_tide_duration)
+
+        # elif  tide_no < self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration:
+        #     tide = self.get_tide_string(TIDE_LOW)
+        #     # next_tide = 
+        # elif  tide_no < self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration:
+        #     tide = self.get_tide_string(TIDE_COMING_IN)
+        #     # next_tide = 
+        # else:
+        #     raise ValueError('I do not think this is going to trigger')
+
+        return tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color
+        
+        
 
     def get_tide(self):
         full_tide_cycle_length = self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration
@@ -542,12 +617,12 @@ class MadmiralsGameInstance:
                                 if s_cell.troops > 1:
                                     potential_moves.append(self.PotentialMove(s_cell, t_cell, action=ACTION_MOVE_NORMAL, weight=s_cell.troops*2, dir=neighbor[1]))
                                     potential_moves.append(self.PotentialMove(s_cell, t_cell, action=ACTION_MOVE_HALF, weight=s_cell.troops, dir=neighbor[1]))
-                                    potential_moves.append(self.PotentialMove(s_cell, t_cell, action=ACTION_MOVE_ALL, weight=s_cell.troops, dir=neighbor[1]))
+                                    #potential_moves.append(self.PotentialMove(s_cell, t_cell, action=ACTION_MOVE_ALL, weight=s_cell.troops, dir=neighbor[1]))
                                     
                             elif s_cell.cell_type in (CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED, CELL_TYPE_MOUNTAIN_BROKEN):                            
                                 pass
                             elif s_cell.cell_type in (CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4):                            
-                                potential_moves.append(self.PotentialMove(s_cell, t_cell, action=ACTION_MOVE_NONE, weight=s_cell.troops*2, dir=DIR_NOWHERE))
+                                potential_moves.append(self.PotentialMove(s_cell, t_cell, action=ACTION_MOVE_NORMAL, weight=s_cell.troops*2, dir=DIR_NOWHERE))
 
                             elif s_cell.cell_type == CELL_TYPE_SWAMP:            
                                 if s_cell.troops > 1: # leave small troops to die
@@ -583,7 +658,8 @@ class MadmiralsGameInstance:
                 for i in range(len(potential_moves)):
                     list_weights.append(potential_moves[i].weight)
 
-                list_decided_move_or_moves = random.choices(potential_moves, weights=list_weights, k=1) # k indicates how many choices to return.. may be worth increasing above 1 to queue up multiple actions
+                num_moves_to_queue = 1
+                list_decided_move_or_moves = random.choices(potential_moves, weights=list_weights, k=num_moves_to_queue) # k indicates how many choices to return.. may be worth increasing above 1 to queue up multiple actions
                 first_moves_first = list_decided_move_or_moves[0]
 
                 #print((this_one.source_cell.row, this_one.source_cell.col), action=this_one.action, direction=this_one.dir)
