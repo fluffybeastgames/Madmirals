@@ -37,11 +37,11 @@ class MadmiralsGameInstance:
         self.turn = 0
 
         self.player_color = player_color # if not none, override the default seed's color for the player TODO implement downstream from here
-        self.player_name = player_name
+        self.player_name = player_name if player_name else 'SLAYER 1'
         
-        self.high_tide_duration = 20
+        self.high_tide_duration = 90
         self.retreating_tide_duration = 10
-        self.low_tide_duration = 200
+        self.low_tide_duration = 90
         self.incoming_duration = 10
 
         self.num_rows = num_rows # either a predefined integer value (preferably higher than 5) or None. 
@@ -142,6 +142,24 @@ class MadmiralsGameInstance:
         #     raise ValueError('I do not think this is going to trigger')
 
         return tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color
+    
+
+    def tide_just_changed_to(self):
+        # Returns none if the tide did not change on the current turn
+        # otherwise returns the tide code
+        full_tide_cycle_length = self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration + self.incoming_duration
+        tide_no = self.turn % full_tide_cycle_length
+
+        if tide_no == 0:
+            return TIDE_HIGH
+        elif  tide_no == self.high_tide_duration:
+            return TIDE_GOING_OUT
+        elif  tide_no == self.high_tide_duration + self.retreating_tide_duration:
+            return TIDE_LOW
+        elif  tide_no == self.high_tide_duration + self.retreating_tide_duration + self.low_tide_duration:
+            return TIDE_COMING_IN
+        else:
+            return None
         
         
 
@@ -408,7 +426,7 @@ class MadmiralsGameInstance:
             
             target_cell.owner = self.players[p].user_id
             target_cell.cell_type = CELL_TYPE_ADMIRAL
-            target_cell.troops = 10 # consider playing w/ starting troops
+            target_cell.troops = 100 # consider playing w/ starting troops
 
 
 
@@ -722,10 +740,13 @@ class MadmiralsGameInstance:
                 print('move city!')
                 #TODO move this logic elswhere and make it work if player active celled past here quickly
                 #TODO 1 day later.. yeah refactor this because it's getting fixed anyway.. gonna let break for now
-                self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
-                self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
-                self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
-                self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
+                # changing this action to low tide only
+                if self.get_tide() == TIDE_LOW:
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
+                    self.parent.game.players[pending_action.user_id].player_queue.add_action_to_queue((target_cell.row, target_cell.col), ACTION_MOVE_NONE, DIR_NOWHERE)
+
                 return True
             else:
                 return False 
@@ -772,6 +793,8 @@ class MadmiralsGameInstance:
             if self.action_is_valid(next_action):
                 source_cell = self.game_board[next_action.source_address]
                 target_cell = self.game_board[next_action.target_address]
+                source_cell.changed_this_turn = True
+                target_cell.changed_this_turn = True
 
                 starting_troops = source_cell.troops
                 if next_action.action == ACTION_MOVE_NORMAL:
@@ -781,11 +804,11 @@ class MadmiralsGameInstance:
                     troops_to_move = math.trunc(starting_troops/2) # round down w/ truncate to make sure we never move our last troop
 
                 elif next_action.action == ACTION_MOVE_CITY:
-                    troops_to_move = starting_troops
+                    troops_to_move = starting_troops - 1
                                             
                 elif next_action.action == ACTION_MOVE_ALL:
                     # print(f'cell type {source_cell.cell_type} / in ({CELL_TYPE_ADMIRAL} {CELL_TYPE_SHIP}) ')
-                    if source_cell.cell_type in (CELL_TYPE_ADMIRAL, ): #, CELL_TYPE_SHIP):
+                    if source_cell.cell_type in (CELL_TYPE_ADMIRAL, CELL_TYPE_SHIP):
                         troops_to_move = starting_troops - 1
                     else:
                         troops_to_move = starting_troops
@@ -801,44 +824,18 @@ class MadmiralsGameInstance:
 
 
                 source_cell.troops -= troops_to_move
-                source_cell.changed_this_turn = True
-
+                
                 if source_cell.troops <= 0:
                     source_cell.owner = None
                     
-                    if next_action.action == ACTION_MOVE_CITY:
-                        invading_ship_count = 0
-                        
-                        if source_cell.cell_type == CELL_TYPE_SHIP: invading_ship_count = 1
-                        elif source_cell.cell_type == CELL_TYPE_SHIP_2: invading_ship_count = 2
-                        elif source_cell.cell_type == CELL_TYPE_SHIP_3: invading_ship_count = 3
-                        elif source_cell.cell_type == CELL_TYPE_SHIP_4: invading_ship_count = 4
-                        else: invading_ship_count = 0
-
-                        if target_cell.cell_type == CELL_TYPE_SHIP: invading_ship_count += 1
-                        elif target_cell.cell_type == CELL_TYPE_SHIP_2: invading_ship_count += 2
-                        elif target_cell.cell_type == CELL_TYPE_SHIP_3: invading_ship_count += 3
-                        elif target_cell.cell_type == CELL_TYPE_SHIP_4: invading_ship_count += 4
-                            
-                        output_type = CELL_TYPE_SHIP
-
-                        if invading_ship_count == 2:
-                            output_type = CELL_TYPE_SHIP_2
-                        elif invading_ship_count == 3:
-                            output_type = CELL_TYPE_SHIP_3
-                        elif invading_ship_count == 4:
-                            output_type = CELL_TYPE_SHIP_4
-                        elif invading_ship_count > 4:
-                            output_type = CELL_TYPE_ADMIRAL
-
-                        source_cell.cell_type = CELL_TYPE_BLANK
-                        target_cell.cell_type = output_type
-                        #print(f'output cell type: {target_cell.cell_type}')
-
-
+ 
                 if target_cell.owner == next_action.user_id: # combine forces
                     target_cell.troops += troops_to_move
-                    target_cell.changed_this_turn = True
+                    
+                    if source_cell.cell_type in (CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4) and target_cell.cell_type in (CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4, CELL_TYPE_BLANK):
+                        self.combine_ships(source_cell, target_cell)
+                    
+                     
                 
                 else: # combat
                     target_cell.troops -= troops_to_move
@@ -846,27 +843,62 @@ class MadmiralsGameInstance:
                         old_owner = target_cell.owner
                         target_cell.troops *= -1
                         target_cell.owner = next_action.user_id
-                        target_cell.changed_this_turn = True
-
+                    
                         # Mountain breaking check
                         if target_cell.cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
                             target_cell.cell_type = CELL_TYPE_MOUNTAIN_BROKEN
-                            target_cell.changed_this_turn = True
-
+                            
                         # check if player captured target's last admiral - if so you inherit their kingdom
                         if old_owner is not None and target_cell.cell_type == CELL_TYPE_ADMIRAL:
                             if self.get_admiral_count(old_owner) <= 0:
                                 print(f'Player {old_owner} defeated')
                                 self.hostile_takeover_of_player(victim=old_owner, victor=uid)
-                    
+
+                        if next_action.action == ACTION_MOVE_CITY:
+                            self.combine_ships(source_cell, target_cell)
+                                                
                     # Mountain cracking check
                     elif target_cell.cell_type == CELL_TYPE_MOUNTAIN:
                         target_cell.cell_type = CELL_TYPE_MOUNTAIN_CRACKED
-                        target_cell.changed_this_turn = True
+                        
 
             else:
                 self.pop_until_valid_or_empty(uid)
                 
+    def combine_ships(self, source_cell, target_cell):
+        invading_ship_count = 0
+        
+        if source_cell.cell_type == CELL_TYPE_SHIP: invading_ship_count = 1
+        elif source_cell.cell_type == CELL_TYPE_SHIP_2: invading_ship_count = 2
+        elif source_cell.cell_type == CELL_TYPE_SHIP_3: invading_ship_count = 3
+        elif source_cell.cell_type == CELL_TYPE_SHIP_4: invading_ship_count = 4
+        else: invading_ship_count = 0
+
+        if target_cell.cell_type == CELL_TYPE_SHIP: invading_ship_count += 1
+        elif target_cell.cell_type == CELL_TYPE_SHIP_2: invading_ship_count += 2
+        elif target_cell.cell_type == CELL_TYPE_SHIP_3: invading_ship_count += 3
+        elif target_cell.cell_type == CELL_TYPE_SHIP_4: invading_ship_count += 4
+            
+        output_type = CELL_TYPE_SHIP
+
+        if invading_ship_count == 2:
+            output_type = CELL_TYPE_SHIP_2
+            print('ship 2 created!')
+        elif invading_ship_count == 3:
+            output_type = CELL_TYPE_SHIP_3
+            print('ship 3 created!')
+        elif invading_ship_count == 4:
+            output_type = CELL_TYPE_SHIP_4
+            print('ship 4 created!')
+        elif invading_ship_count > 4:
+            output_type = CELL_TYPE_ADMIRAL
+
+            print(f'Source {source_cell.cell_type}\tTarget {target_cell.cell_type} \t{invading_ship_count}')
+            print('NEW ADMIRAL created!')
+
+        source_cell.cell_type = CELL_TYPE_BLANK
+        target_cell.cell_type = output_type
+
     def advance_game_turn(self): # move / attack / takeover 
         self.turn += 1
 
@@ -906,6 +938,7 @@ class MadmiralsGameInstance:
 
 
         elif self.game_mode in [GAME_MODE_FFA, GAME_MODE_FFA_CUST]: 
+            
             
             #list_changes_this_turn = []
             # Reset change checker, so that we can look for new changes this turn
@@ -950,13 +983,22 @@ class MadmiralsGameInstance:
                     if owner is not None:
 
                         if ((cell_type == CELL_TYPE_ADMIRAL and self.turn % ADMIRAL_GROW_RATE == 0) or
-                            (cell_type == CELL_TYPE_SHIP and self.turn % CITY_GROW_RATE == 0) or
-                            (cell_type == CELL_TYPE_BLANK and self.turn % BLANK_GROW_RATE == 0) or
+                            (cell_type in (CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4) and self.turn % CITY_GROW_RATE == 0) or
+                            (cell_type == CELL_TYPE_BLANK and self.get_tide() == TIDE_LOW and self.turn % BLANK_GROW_RATE == 0) or
                             (cell_type == CELL_TYPE_MOUNTAIN_BROKEN and self.turn % BROKEN_MTN_GROW_RATE == 0)):                   
+                                troops_to_add = 1
+
+                                if cell_type == CELL_TYPE_SHIP_2: troops_to_add = 2
+                                if cell_type == CELL_TYPE_SHIP_3: troops_to_add = 3
+                                if cell_type == CELL_TYPE_SHIP_4: troops_to_add = 4
+                                
+
                                 self.game_board[(i,j)].troops += 1
+
+                                
                                 self.game_board[(i,j)].changed_this_turn = True
                         
-                        elif cell_type == CELL_TYPE_SWAMP and self.turn % SWAMP_DRAIN_RATE == 0:
+                        elif cell_type == CELL_TYPE_SWAMP and self.get_tide() == TIDE_LOW and self.turn % SWAMP_DRAIN_RATE == 0:
                             self.game_board[(i,j)].troops -= 1
                             self.game_board[(i,j)].changed_this_turn = True                            
 
@@ -998,6 +1040,7 @@ class MadmiralsGameInstance:
             self.parent.db.run_sql(sql, list_changes, execute_many=True)
 
             self.update_game_status()
+
 
             if self.game_status == GAME_STATUS_GAME_OVER_WIN:
                 #tk.messagebox.askokcancel(title='GG', message='gg')
@@ -1041,6 +1084,7 @@ class MadmiralsGameInstance:
         
         def update_visibility_status(self, player_id): #TODO REFACTOR
             if not self.parent.parent.fog_of_war:
+                # if self.hidden: self.changed_this_turn = True
                 self.hidden = False
                 # self.cell_type_last_seen_by_player = self.cell_type # on second thought let's not
             
@@ -1059,8 +1103,10 @@ class MadmiralsGameInstance:
                 (self.row<(self.parent.num_rows-1) and self.col<(self.parent.num_cols-1) and self.parent.game_board[(self.row+1, self.col+1)].owner == player_id)# bot right
                 ):
                     # print(f'{(row, col)} {player_id}')
+                    if self.hidden: self.changed_this_turn = True
                     self.hidden = False
                     self.cell_type_last_seen_by_player = self.cell_type
                 
             else:
+                if not self.hidden: self.changed_this_turn = True
                 self.hidden = True             

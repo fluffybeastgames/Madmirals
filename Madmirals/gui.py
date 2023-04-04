@@ -11,11 +11,9 @@ from seedy import Seedling # used to determine what the seed demands
 from image_data import * 
 
 class MadmiralsGUI:
-
     def __init__(self, parent):
         self.root = tk.Tk()
         self.root.title('Madmirals')
-
         self.images = ImageData()
         
         self.about_window = None # self.AboutWindow(self)
@@ -29,12 +27,14 @@ class MadmiralsGUI:
         self.frame_scoreboard = tk.Frame(master=self.root)
         self.frame_tide_chart = tk.Frame(master=self.root)        
         self.frame_win_conditions = tk.Frame(master=self.root)
-
+        self.frame_splash_screen = tk.Frame(master=self.root)
+        
         self.cell_font_size = DEFAULT_FONT_SIZE
         self.label_size = DEFAULT_LABEL_SIZE
-
+    
         self.apply_bindings()
 
+        self.populate_splash_screen()
 
     class AboutWindow:
         def __init__(self, parent):
@@ -42,13 +42,13 @@ class MadmiralsGUI:
             
             # self.window.geometry('500x250')
             self.window.title('About Madmirals')
-            tk.Label(self.window, text='Madmirals', font=('Helvetica 14 bold')).grid(row=0,column=0)
-            tk.Label(self.window, text='A game by Matt Carleton', font=('Helvetica 12')).grid(row=1,column=0, sticky='w')
+            tk.Label(self.window, text='Madmirals', font=('Arial 14 bold')).grid(row=0,column=0)
+            tk.Label(self.window, text='A game by Matt Carleton', font=('Arial 12')).grid(row=1,column=0, sticky='w')
 
-            tk.Label(self.window, text='How to Play', font=('Helvetica 12 bold')).grid(row=2,column=0, sticky='w')
-            tk.Label(self.window, text='1. Starting a new game', font=('Helvetica 10 bold')).grid(row=3,column=0, sticky='w')
-            tk.Label(self.window, text='Click New Game in the File menu (shortcut Ctrl+N) to create a new game with randomized parameters', font=('Helvetica 10')).grid(row=4,column=0, sticky='w')
-            tk.Label(self.window, text='To customize the parameters of the game, click on Game Settings in the File menu (shortcut Ctrl+Shift+N)', font=('Helvetica 10')).grid(row=5,column=0, sticky='w')
+            tk.Label(self.window, text='How to Play', font=('Arial 12 bold')).grid(row=2,column=0, sticky='w')
+            tk.Label(self.window, text='1. Starting a new game', font=('Arial 10 bold')).grid(row=3,column=0, sticky='w')
+            tk.Label(self.window, text='Click New Game in the File menu (shortcut Ctrl+N) to create a new game with randomized parameters', font=('Arial 10')).grid(row=4,column=0, sticky='w')
+            tk.Label(self.window, text='To customize the parameters of the game, click on Game Settings in the File menu (shortcut Ctrl+Shift+N)', font=('Arial 10')).grid(row=5,column=0, sticky='w')
         
         def show(self):
             self.window.deiconify()
@@ -58,24 +58,14 @@ class MadmiralsGUI:
 
     def open_about_window(self):
         #self.about_window = self.AboutWindow(self)
+        print('to do')
         if self.about_window is None: 
             self.about_window = self.AboutWindow(self)
         else:
             # self.about_window.show()
             # TODO figure out how to get the window to deiconify so we can keep it in memory
             self.about_window = self.AboutWindow(self)
-            
-
-    # class GameBoardArea:
-    #     pass 
-
-    # class Scoreboard:
-    #     pass 
-
-
-    # class 
-
-        
+                    
     def apply_bindings(self):
         # Apply keyboard
         self.root.bind('<Key>', self.key_press_handler)
@@ -85,7 +75,7 @@ class MadmiralsGUI:
         self.root.bind('<Control-Q>', self.quit_game)
         self.root.bind('<Control-q>', self.quit_game)
         self.root.bind('<Control-n>', self.open_game_settings)          # WARNING this will be reversed if caps lock is on.. look into 
-        self.root.bind('<Control-N>', self.new_game)                    # bind_caps_lock = e1.bind('<Lock-KeyPress>', caps_lock_on)  
+        self.root.bind('<Control-N>', self.quick_game)                    # bind_caps_lock = e1.bind('<Lock-KeyPress>', caps_lock_on)  
         # self.root.bind('<Control-M>', self.open_game_settings)
         # self.root.bind('<Control-m>', self.open_game_settings)
         self.root.bind('<Control-F>', self.toggle_fog_of_war)
@@ -105,14 +95,24 @@ class MadmiralsGUI:
         print('test')
         self.root.destroy()
 
-    def new_game(self, event=None):
+    def quick_game(self, event=None):
         num_rows = None
         num_cols = None
         num_players = None
         seed = None 
         game_mode = GAME_MODE_FFA
+        
+        player_color = None
+        player_name = 'PLAYER 1'
+        if self.parent.game is not None:
+            player_name = self.parent.game.players[0].user_desc 
+        #     player_name = (self.parent.game.players[0].color_bg, self.parent.game.players[0].color_fg)
 
-        self.parent.create_new_game(num_rows=num_rows, num_cols=num_cols, num_players=num_players, seed=seed, game_mode=game_mode)            
+        self.parent.create_new_game(num_rows=num_rows, num_cols=num_cols, num_players=num_players, seed=seed, game_mode=game_mode, player_color=player_color, 
+            player_name=player_name)            
+
+        print('withdraw')
+        self.frame_splash_screen.grid_remove()
 
     class GUI_Assets: 
         MAGIC_NUM_TO_FIX_CELL_SIZE = 5 # tk.Button seems to add 5 px to the height and width 
@@ -206,7 +206,12 @@ class MadmiralsGUI:
                     else:
                         action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/cities
                 else:
-                    action = ACTION_MOVE_NORMAL
+                    list_ship_cell_types = [CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4]
+                    if self.parent.game.game_board[active_cell_address].cell_type in list_ship_cell_types:
+                        action = ACTION_MOVE_CITY # downstread we will override this when crossing admirals/cities
+                        print('ehlloo?')
+                    else:
+                        action = ACTION_MOVE_NORMAL
         
                 self.parent.game.players[player_id].player_queue.add_action_to_queue(active_cell_address, action, dir) 
 
@@ -218,7 +223,7 @@ class MadmiralsGUI:
         
         filemenu = tk.Menu(menubar, tearoff=0)
         filemenu.add_command(label='New Game...', command=self.open_game_settings, accelerator='Ctrl+N')
-        filemenu.add_command(label='Quick Game', command=self.new_game, accelerator='Ctrl+Shift+N')
+        filemenu.add_command(label='Quick Game', command=self.quick_game, accelerator='Ctrl+Shift+N')
         filemenu.add_command(label='Open Replay', command=self.open_replay_window, accelerator='Ctrl+O')
         filemenu.add_separator()
         filemenu.add_command(label='About', command=self.open_about_window)
@@ -251,22 +256,29 @@ class MadmiralsGUI:
         if self.label_size < MAX_LABEL_SIZE:
            self.label_size = min(self.label_size+increment*2, MAX_LABEL_SIZE)
 
+        self.parent.game_settings_changed_this_turn = True 
+
     def zoom_out(self, increment=3):
         if self.cell_font_size > MIN_FONT_SIZE:
             self.cell_font_size = max(self.cell_font_size-increment, MIN_FONT_SIZE)
         
         if self.label_size > MIN_LABEL_SIZE:
             self.label_size = max(self.label_size-increment*2, MIN_LABEL_SIZE)
+        
+        self.parent.game_settings_changed_this_turn = True 
 
     def zoom_reset(self):
         self.cell_font_size = DEFAULT_FONT_SIZE
         self.label_size = DEFAULT_LABEL_SIZE
 
+        self.parent.game_settings_changed_this_turn = True 
+
     def toggle_fog_of_war(self, event=None): # TODO move to game manager (or game?)
         if self.parent.game is not None:
             print('Toggling fog of war')
             self.parent.fog_of_war = not self.parent.fog_of_war
-
+            self.parent.game_settings_changed_this_turn = True 
+            
     def toggle_debug_mode(self, event=None): # TODO move to game manager
         self.parent.debug_mode = not self.parent.debug_mode
         print(f'Set debug mode to {self.parent.debug_mode}')
@@ -275,7 +287,7 @@ class MadmiralsGUI:
         # TODO use top.withdraw() and top.deiconify() to hide/show windows
         print('Open replay')
         # TODO add a window w/ list of replays and other options
-        game_id = 192
+        game_id = 1543
 
         self.parent.create_new_replay_game(game_id=game_id)     
     
@@ -291,11 +303,22 @@ class MadmiralsGUI:
             self.top = tk.Toplevel(self.parent.root) 
             self.top.transient()
             self.top.title('New Game Settings')
-            self.f_gui = tk.Frame(self.top)
+            self.f_gui = tk.Frame(self.top, bg=COLOR_TIDE_LOW)
             self.define_layout()
-                        
+            self.assign_imitial_vals()
+
+        def assign_imitial_vals(self):
+            seed = random.randint(0, 10**10)
+            self.frame_game.new_seed.set(seed) # a random seed, same range as default 'New Game'
+            
+            self.frame_params.val_rows.set(Seedling.get_num_rows(seed))
+            self.frame_params.val_cols.set(Seedling.get_num_cols(seed))
+            self.frame_params.val_bots.set(Seedling.get_num_players(seed) - 1) # because the prompt is # enemies, not # players
+
+            self.player_name.set('ZEKE')
+    
         def define_layout(self):            
-            lbl_header = tk.Label(self.f_gui, text='Game Settings', font=('Helvetica 10 bold'))
+            lbl_header = tk.Label(self.f_gui, text='Game Settings', font=('Arial 10 bold'))
 
             #frame_player = self.get_frame_player()
             self.frame_game = tk.Frame(self.f_gui, highlightbackground='black', highlightthickness=2)
@@ -318,21 +341,20 @@ class MadmiralsGUI:
             self.frame_params.grid(row=2, column=0, padx=10, pady=10, sticky='news')
             self.frame_options.grid(row=2, column=1, padx=10, pady=10, sticky='news')
             
-            btn_ok.grid(row=3, column=0, pady=10, stick='e')
-            btn_cancel.grid(row=3, column=1, pady=10, sticky='w')
+            btn_ok.grid(row=3, column=0, padx=10, pady=10, stick='e')
+            btn_cancel.grid(row=3, column=1, padx=10, pady=10, sticky='w')
 
             self.f_gui.pack()
 
         def pop_sett_frame_game(self):
             f = self.frame_game
             
-            lbl_seed = tk.Label(f, text= 'Seed', font=('Helvetica 10 bold'))
+            lbl_seed = tk.Label(f, text= 'Seed', font=('Arial 12 bold'))
             f.new_seed = tk.StringVar()
-            f.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
             seed_entry = tk.Entry(f, textvariable=f.new_seed, width=12)
             btn_generate_new_seed = tk.Button(master=f, text='New Seed', width=14, height=1, highlightcolor='orange', command=self.generate_new_seed, bg='light blue')
             
-            lbl_game_mode = tk.Label(f, text= 'Game Mode', font=('Helvetica 10 bold'))
+            lbl_game_mode = tk.Label(f, text= 'Game Mode', font=('Arial 12 bold'))
             avail_game_modes = [
                 'Free For All',
                 'Team Battle',
@@ -372,24 +394,28 @@ class MadmiralsGUI:
             else:
                 self.player_name.set('Some Square') # a random seed, same range as default 'New Game'
             
-            self.player_has_set_a_custom_color = False
+            # self.player_has_set_a_custom_color = False
             self.player_color_bg = tk.StringVar()
             self.player_color_fg = tk.StringVar()
             
+            bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
+            fg = '#FFFFFF' if is_color_dark(bg) else '#000000'
+            self.player_color_bg.set(bg)
+            self.player_color_fg.set(fg)            
    
-            lbl_player = tk.Label(f, text='Player', font=('Helvetica 10 bold'))
-            self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=25, bg='light green', font=('Arial 16 bold'))
+            lbl_player = tk.Label(f, text='Player', font=('Arial 10 bold'))
+            self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=20, bg=bg, fg=fg, font=('Arial 14 bold'))
     
             # btn_generate_new_user = tk.Button(master=self.top, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
             btn_player_color = tk.Button(f, text='Select Color', width=14, height=1, bg='light blue', command=self.prompt_for_user_color)
-            btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
+            #btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
+            btn_reset_color = tk.Button(f, text='Random Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
             
             lbl_player.grid(row=0,column=0, padx=10, pady=(5,2), sticky='w')
-            self.player_name_entry.grid(row=1,column=0, padx=10, pady=(2,2), sticky='w')
-            btn_player_color.grid(row=1,column=1, padx=10, pady=(2,2))
-            btn_reset_color.grid(row=2,column=1, padx=10, pady=(2, 10))
+            self.player_name_entry.grid(row=1,column=0, columnspan=2, padx=10, pady=(2,2), sticky='w')
+            btn_player_color.grid(row=2, column=0, padx=10, pady=(2,2))
+            btn_reset_color.grid(row=2, column=1, padx=10, pady=(2,2))
 
-               
         def prompt_for_user_color(self):
             # Bring up a color picker window. If the user picks a color, check whether fg should be black or white
             # if they cancel, revert to the 'random' default for currently displayed seed
@@ -403,32 +429,27 @@ class MadmiralsGUI:
                 self.player_color_fg.set(fg)
 
                 self.player_name_entry.config(bg=bg, fg=fg) #TODO HERE MOVE THIS ENTRY TO settingdwindow
-                self.player_has_set_a_custom_color = True
+                # self.player_has_set_a_custom_color = True
                 
                 # print(is_color_dark(c_code[1]))
 
-
         def reset_user_color(self):
-            # Reverts the user color to the one generated by the current seed
-            #TODO
-
-            bg = '#FFFFFF'
-            fg = 'dark blue'
+            bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
+            fg = '#FFFFFF' if is_color_dark(bg) else '#000000'
             
             self.player_color_bg.set(bg) # we will grab this value on apply settings
             self.player_color_fg.set(fg)
 
             self.player_name_entry.config(bg=bg, fg=fg)
-            self.player_has_set_a_custom_color = False
+            # self.player_has_set_a_custom_color = False
 
                 # print(is_color_dark(c_code[1]))                
 
-
         def pop_sett_frame_params(self):
             f = self.frame_params
-            lbl_bots = tk.Label(f, text= 'Opponents', font=('Helvetica 10 bold'))
-            lbl_rows = tk.Label(f, text= 'Game Board Height', font=('Helvetica 10 bold'))
-            lbl_cols = tk.Label(f, text= 'Game Board Width', font=('Helvetica 10 bold'))
+            lbl_bots = tk.Label(f, text= 'Opponents', font=('Arial 10 bold'))
+            lbl_rows = tk.Label(f, text= 'Game Board Height', font=('Arial 10 bold'))
+            lbl_cols = tk.Label(f, text= 'Game Board Width', font=('Arial 10 bold'))
             
             f.val_bots = tk.DoubleVar()
             f.val_rows = tk.DoubleVar()
@@ -482,7 +503,6 @@ class MadmiralsGUI:
             rand_cols.grid(row=31,column=0, sticky='w', padx=(15,5))
             cust_cols.grid(row=31, column=1, sticky='w', padx=(2,0))
             slider_cols.grid(row=31, column=2, sticky='w', padx=(0,10), pady=(20,0))
-            
 
         def slider_changed_bots(self, event):
             self.frame_params.bots_rand_or_cust.set(USE_CUST)
@@ -493,17 +513,18 @@ class MadmiralsGUI:
         def slider_changed_cols(self, event):
             self.frame_params.cols_rand_or_cust.set(USE_CUST)
 
-
         def pop_sett_frame_options(self):
             f = self.frame_options
             
             print('TODO one more frame here')
-            
-        
-        # def generate_new_user():
-        #     print('TODO make new user! And also convert the user entry to a dropdown :)')
-        
-                
+
+            # Include Swamps    checkbox
+            # Starting Troops   entry
+            # Swamp / mtn spawn rate
+            # Ship behavior     dropdown 'Can combine into Admiral' 'Cannot move', how many ships = Admiral
+            # Tides checkbox
+            # Duration: High    Low     Transition
+    
         def apply_settings(self):
             # Validate input; if valid, create a new instance of game with the passed params then kill this window
 
@@ -511,7 +532,8 @@ class MadmiralsGUI:
             num_rows = int(self.frame_params.val_rows.get()) if self.frame_params.rows_rand_or_cust.get() == USE_CUST else None
             num_cols = int(self.frame_params.val_cols.get()) if self.frame_params.cols_rand_or_cust.get() == USE_CUST else None
             
-            player_color = (self.player_color_bg.get(), self.player_color_fg.get()) if self.player_has_set_a_custom_color else None
+            #player_color = (self.player_color_bg.get(), self.player_color_fg.get()) if self.player_has_set_a_custom_color else None
+            player_color = (self.player_color_bg.get(), self.player_color_fg.get())
             player_name = self.player_name.get()
             
             new_seed_text = self.frame_game.new_seed.get()
@@ -522,9 +544,10 @@ class MadmiralsGUI:
 
             self.parent.parent.create_new_game(num_rows, num_cols, num_players, seed, game_mode=GAME_MODE_FFA_CUST, player_color=player_color, player_name=player_name)
             
+            self.parent.frame_splash_screen.grid_remove()
+
             self.top.destroy()
             # self.top = None
-
 
         def cancel_settings(self):
             if self.parent.parent.game is not None and self.parent.parent.game.game_status == GAME_STATUS_PAUSE:
@@ -533,13 +556,41 @@ class MadmiralsGUI:
             self.top.destroy()
             # self.top = None
                     
+    # class SplashScreen:
+    #     def __init__(self):
+    #         self.splash_frame = tk.Frame()
+    #         self.splash_frame.labelTitle = tk.Label(self.splash_Frame)
 
+    def populate_splash_screen(self):
+        # def open_game_from_splash(self):
+        #     self.open_game_settings()
+
+        if self.frame_splash_screen is not None: self.frame_splash_screen.destroy()
+        self.frame_splash_screen = tk.Frame(master=self.root, width=250, height=250, bg=COLOR_TIDE_HIGH)
+        
+        lbl_header = tk.Label(self.frame_splash_screen, text='Madmirals', font='Arial 28 bold', bg=COLOR_TIDE_HIGH, fg='#FFFFFF')
+        btn_new_game = tk.Button(
+            master=self.frame_splash_screen, 
+            text='Play', width=14, height=2, 
+            command=self.open_game_settings, bg='light blue', font='Arial 18 bold')
+
+        btn_help = tk.Button(
+            master=self.frame_splash_screen, 
+            text='How to Play', width=14, height=1, 
+            command=self.open_about_window, bg='light blue', font='Arial 18 bold')
+                        
+        lbl_header.grid(row=0, column=0, padx=30, pady=(30, 15))
+        btn_new_game.grid(row=5, column=0, padx=30, pady=15)
+        btn_help.grid(row=6, column=0, padx=30, pady=(15,30))
+        
+        self.frame_splash_screen.grid(row=0, column=0)
 
     def populate_game_board_frame(self):
         if not self.frame_game_board is None: self.frame_game_board.destroy()
         #if not canvas is None: canvas.destroy()
         
-        self.frame_game_board = tk.Frame(master=self.root, width=250, height=250, bg=COLOR_TIDE_HIGH)
+        #self.frame_game_board = tk.Frame(master=self.root, width=250, height=250, bg=COLOR_TIDE_HIGH)
+        self.frame_game_board = tk.Frame(master=self.root, bg=COLOR_TIDE_HIGH)
         canvas = tk.Canvas(self.frame_game_board, width=250, height=250, scrollregion=(0, 0, 6000, 6000)) # TODO get this to work, bg=COLOR_TIDE_HIGH)
         
         hbar=tk.Scrollbar(self.frame_game_board,orient=tk.HORIZONTAL)
@@ -549,9 +600,9 @@ class MadmiralsGUI:
         canvas.config(width=250,height=250)
         canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
         
-        canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S), padx=(15,0),pady=(15,0),)
-        hbar.grid(row=1, column=0, sticky='ew', padx=(15,0))
-        vbar.grid(row=0, column=1, sticky='ns', pady=(15,0))
+        canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S), padx=(45,0),pady=(45,0))
+        hbar.grid(row=1, column=0, sticky='ew', padx=(45,0))
+        vbar.grid(row=0, column=1, sticky='ns', pady=(45,0))
         
         self.frame_buttons = tk.Frame(master=canvas)
         self.board_cell_buttons = {}
@@ -564,8 +615,11 @@ class MadmiralsGUI:
                     text='',
                     width=250, height=250,
                     image=self.images.image_empty, 
-                    compound=tk.CENTER
-                    # highlightcolor='orange'                        
+                    compound=tk.CENTER #,
+                    # highlightthickness=5,
+                    # highlightcolor='red',
+                    # highlightbackground='red'
+                    
                     ) # add cell to the dictionary and establish default behavior
                 self.board_cell_buttons[(i, j)].grid(row=i, column=j) # place the cell in the frame
 
@@ -574,7 +628,7 @@ class MadmiralsGUI:
                 self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
         
         self.frame_buttons.grid(row=0, column=0)
-        self.frame_game_board.grid(row=0, column=0, rowspan=10, pady=(15,15), padx=(15, 15), ipadx=8, ipady=8)
+        self.frame_game_board.grid(row=0, column=0, rowspan=10, pady=(15,15), padx=(15, 15), ipadx=25, ipady=25)
         self.frame_game_board.focus_set()
 
     def populate_scoreboard_frame(self):
@@ -675,9 +729,12 @@ class MadmiralsGUI:
         if self.parent.fog_of_war and cell.hidden:
             bg_color = '#222222'
             fg_color = '#DDDDDD'
+            
         elif cell.owner is not None:
             bg_color = self.parent.game.players[cell.owner].color_bg
-            fg_color = self.parent.game.players[cell.owner].color_fg
+            fg_color = self.parent.game.players[cell.owner].color_fg 
+            
+
         else:
             
             if cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
@@ -701,6 +758,13 @@ class MadmiralsGUI:
                 bg_color = color[0]
                 fg_color = color[1]
             
+        
+        if cell.owner is not None:
+            highlightbackground  = self.parent.game.players[cell.owner].color_bg
+        else:
+            highlightbackground  = bg_color
+            
+            
 
         relief = tk.RAISED if self.parent.game.active_cell == (cell.row, cell.col) else tk.SUNKEN
         
@@ -713,35 +777,49 @@ class MadmiralsGUI:
         # elif cell_type == CELL_TYPE_BLANK and not cell.hidden and (cell.row**3+cell.col**2+1) % (turn+1) == 0:
         #     relief = tk.GROOVE
 
-
         img = self.images.get_image_by_cell_type(cell.cell_type, tide) # the default icon for this cell
         
-        if cell.hidden and cell.cell_type_last_seen_by_player is None: # override the default if we can't quite make out what's there
-            if cell_type in [CELL_TYPE_SHIP, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED, CELL_TYPE_MOUNTAIN_BROKEN]:
-                img = self.images.image_hex
+        if cell.hidden and cell.cell_type_last_seen_by_player is None and self.parent.fog_of_war: # override the default if we can't quite make out what's there
+            if cell_type in [CELL_TYPE_SHIP, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:#, CELL_TYPE_MOUNTAIN_BROKEN]:
+                img = self.images.image_unknown
             else:
                 img = self.images.image_empty
 
-        return bg_color, fg_color, img, text, relief, font
+        return bg_color, fg_color, img, text, relief, font, highlightbackground 
 
 
     def render(self):  
         tide = self.parent.game.get_tide()
+        new_tide = self.parent.game.tide_just_changed_to()
         
-        #self.frame_game_board.config(bg=self.parent.game.get_tide_color()[0]) # oops this makes the screen flicker
+        render_all_cells = self.parent.game_settings_changed_this_turn or new_tide is not None
+        
+        list_rendered_this_turn = []
         if self.parent.game is not None:          
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
                     cell = self.parent.game.game_board[(i,j)]
-                    
-                    # set display text, color, and image
-                    bg_color, fg_color, img, text, relief, font = self.get_cell_deets(cell, tide)
-                    
-                    self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font, text=text, width=self.label_size, heigh=self.label_size)
 
+                    if render_all_cells or cell.changed_this_turn:
+                        list_rendered_this_turn.append((i, j))
+                        
+                        
+                        # set display text, color, and image
+                        bg_color, fg_color, img, text, relief, font, highlightbackground  = self.get_cell_deets(cell, tide)
+                        
+                        #self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font, text=text, width=self.label_size, height=self.label_size, highlightbackground=highlightbackground )
+                        self.board_cell_buttons[(i, j)].config(
+                            bg=bg_color, fg=fg_color, relief=relief, image=img, 
+                            font=font, text=text, width=self.label_size, height=self.label_size, 
+                            #highlightbackground=highlightbackground 
+                        )
+
+            # print(f'Rendered: {list_rendered_this_turn}')
             self.update_score_board()
             self.update_tide_chart()
-            # self.update_game_board_frame_bg()
+            
+            if render_all_cells:
+                self.update_game_board_frame_bg()
             
 
         self.root.update_idletasks()
@@ -795,21 +873,12 @@ class MadmiralsGUI:
         self.frame_tide_chart.config(bg=bg_color)
         
 
-    # def update_game_board_frame_bg(self):
-    #     print('try to update frame color if tide has changed')
-    #     self.frame_game_board.config(bg='red')
+    def update_game_board_frame_bg(self):
+        self.frame_game_board.config(bg=self.parent.game.get_tide_color()[0])
         
-        
-        # tide = self.parent.game.get_tide()
-        # if tide == TIDE_HIGH
-        
-
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
-        #print('render_game_over')
+        print('TODO render_game_over')
         pass
-
-
-
 
 
 
@@ -843,20 +912,9 @@ def is_color_dark(color):
 
 def adjust_color_brightness(color, brightness_offset):
     try: # Expect a color string formatted ##FFFFFF
-        # print(f'testinggggg {color}')        
-        # r_val = max(0, min(255, int(color[1:3], base=16) + brightness_offset))
-        # g_val = max(0, min(255, int(color[4:5], base=16) + brightness_offset))
-        # b_val = max(0, min(255, int(color[6:7], base=16) + brightness_offset))
-        
-
         r_val = max(0, min(255, int(color[1:3], base=16) + brightness_offset))
         g_val = max(0, min(255, int(color[3:5], base=16) + brightness_offset))
         b_val = max(0, min(255, int(color[5:7], base=16) + brightness_offset))
-        # print(f'\ncolor{color}\ta {color[1:3]}\tb {color[3:5]}\tc {color[5:7]}')
-        # print(r_val)
-        # print(g_val)
-        # print(b_val)
-        
         
         new_hex = '#{:02x}{:02x}{:02x}'.format(r_val, g_val, b_val) # massage the results into exactly 7 characters
         return new_hex
