@@ -57,12 +57,16 @@ MIN_FONT_SIZE = 6
 MAX_FONT_SIZE = 32
 DEFAULT_FONT_SIZE = 10
 
+MIN_LABEL_SIZE = 25
+MAX_LABEL_SIZE = 250
+DEFAULT_LABEL_SIZE = 50
 
-### Game Settings window
+
+### Game Settings window / Seedy
 MIN_BOTS = 1
 MAX_BOTS = 15
-MIN_ROW_OR_COL = 4
-MAX_ROW_OR_COL = 20
+MIN_ROW_OR_COL = 5
+MAX_ROW_OR_COL = 30
 
 USE_DEFAULT = 0 # for radio buttons (use seed default or use a custom override)
 USE_CUST = 1

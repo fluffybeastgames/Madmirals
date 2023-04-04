@@ -13,6 +13,14 @@ from constants import *
 from db import MadDBConnection
 from seedy import Seedling # 
 
+# class GameSettings:
+#     def __init__(self):
+#         self.high_tide_duration = 20
+#         self.retreating_tide_duration = 10
+#         self.low_tide_duration = 200
+#         self.incoming_duration = 10
+
+
 class MadmiralsGameInstance:
     
     def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None, player_color=None, player_name=None):
@@ -22,20 +30,20 @@ class MadmiralsGameInstance:
         if self.seed is None:
             self.seed = random.randint(0, 10**10)
         
-        self.seedling = Seedling(self.seed) # eventually 
+        #self.seedling = Seedling(self.seed) # eventually 
         self.game_id = game_id # the id of the game in table game_logs
         self.game_mode = game_mode
         self.game_status = GAME_STATUS_INIT
         self.turn = 0
 
-        self.high_tide_duration = 20
-        self.retreating_tide_duration = 10
-        self.low_tide_duration = 20
-        self.incoming_duration = 10
-
         self.player_color = player_color # if not none, override the default seed's color for the player TODO implement downstream from here
         self.player_name = player_name
         
+        self.high_tide_duration = 20
+        self.retreating_tide_duration = 10
+        self.low_tide_duration = 200
+        self.incoming_duration = 10
+
         self.num_rows = num_rows # either a predefined integer value (preferably higher than 5) or None. 
         self.num_cols = num_cols #      If it's None, a pseudo-random value will be assigned in 
         self.num_players = num_players
@@ -53,7 +61,6 @@ class MadmiralsGameInstance:
         self.generate_game_world()
 
         if self.game_mode == GAME_MODE_REPLAY:
-            
             sql = f'SELECT turn_num, row, col, cell_type, player_id, troops FROM log_game_moves WHERE game_id={self.game_id} ORDER BY turn_num, row, col'
             
             self.replay_data = self.parent.db.run_sql_select(sql)
@@ -78,7 +85,20 @@ class MadmiralsGameInstance:
         else:
             raise ValueError('I do not think this is going to trigger')
         
+    def get_tide_color(self):
+        tide = self.get_tide()
+
+        if tide == TIDE_HIGH:
+            bg_color = COLOR_TIDE_HIGH
+            fg_color = '#FFFFFF'
+        elif tide == TIDE_LOW:
+            bg_color = COLOR_TIDE_LOW
+            fg_color = 'dark grey'                                
+        elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
+            bg_color = COLOR_TIDE_RISING_3
+            fg_color = '#FFFFFF'
         
+        return (bg_color, fg_color)
 
     def closest_instance_of_entity(self, entity_type, starting_cell):
         MAX_SEARCH_DEPTH = 3  # temp, should line up w/ user input
@@ -182,7 +202,8 @@ class MadmiralsGameInstance:
     def generate_game_world(self):
         print(f'Generating world with seed {self.seed}')
         if self.num_players is None:
-            self.num_players = self.seedling.get_num_players()
+            #self.num_players = self.seedling.get_num_players()
+            self.num_players = Seedling.get_num_players(self.seed)
 
             print(f'Num players: {self.num_players}')
 
@@ -207,13 +228,7 @@ class MadmiralsGameInstance:
 
                 if self.player_name is not None:
                     user_desc = self.player_name
-                    
-            # # dev bonus
-            # if p == 0: 
-            #     #target_cell.troops = 255 #500
-            #     self.players[p].user_desc = 'Zeke'
-            #     player_name
-
+                  
             bot_behavior = None
             if i > 0:    
                 if i % 4 == 0:
@@ -223,15 +238,24 @@ class MadmiralsGameInstance:
                     bot_behavior = self.GameEntity.BEHAVIOR_PETRI
 
             self.players[i] = self.GameEntity(self, player_id, user_desc, bg, fg, bot_behavior)
-            self.turn_order.append(player_id)
+            
+            # every player moves at the same time, but turn order determines the order of operations.
+            # This would be quite unfair if this were a multiplayer game. Instead, it would give player 0 (aka user) an advantage
+            # Currently we're reversing the list after each turn, but maybe it would be best to give player the advantage
+            # ..otherwise best approach could be popping first player id at end of turn and reappending it turn_order!
+            self.turn_order.append(player_id) 
+            
 
-        if self.num_rows is None: self.num_rows = self.seedling.get_num_rows()
-        if self.num_cols is None: self.num_cols = self.seedling.get_num_cols()
+        # if self.num_rows is None: self.num_rows = self.seedling.get_num_rows()
+        # if self.num_cols is None: self.num_cols = self.seedling.get_num_cols()
+        if self.num_rows is None: self.num_rows = Seedling.get_num_rows(self.seed)
+        if self.num_cols is None: self.num_cols = Seedling.get_num_cols(self.seed)
             
         print(f'Rows: {self.num_rows}\tCols: {self.num_cols}\tPlayers{self.num_players}\tSeed{self.seed}')
         
         num_params = 2 # item id; include item or not; how many of item (eg starting 'troops' on idle cities and strength of mtns)
-        result = self.seedling.get_3d_noise_result(self.num_rows, self.num_cols, num_params)
+        #result = self.seedling.get_3d_noise_result(self.num_rows, self.num_cols, num_params)
+        result = Seedling.get_3d_noise_result(self.seed, self.num_rows, self.num_cols, num_params)
         
         for i in range(self.num_rows):
             for j in range(self.num_cols):
@@ -310,6 +334,7 @@ class MadmiralsGameInstance:
             target_cell.owner = self.players[p].user_id
             target_cell.cell_type = CELL_TYPE_ADMIRAL
             target_cell.troops = 10 # consider playing w/ starting troops
+
 
 
     def add_game_to_log(self):
@@ -866,12 +891,12 @@ class MadmiralsGameInstance:
                             self.game_board[(i,j)].changed_this_turn = True                            
                                 
             
-        # refresh the text values of each cell
+        # refresh which cells should be viewable to the user # TODO make an array of these values, one for each player, that way AI has some limitations re trying to walk thru mtns
         for i in range(self.num_rows):
             for j in range(self.num_cols):
                 cell = self.game_board[(i,j)]
                 cell.update_visibility_status(player_id=0)
-                cell.update_display_text()
+                
 
         # Update land and troop counts for each player
         for i in range(self.num_players):
@@ -880,8 +905,9 @@ class MadmiralsGameInstance:
 
 
         if self.game_mode in [GAME_MODE_FFA, GAME_MODE_FFA_CUST]: 
-            # Reverse the turn order - this was every other turn, a given player has priority over any other particular player
-            self.turn_order.reverse()
+            # # Reverse the turn order - this was every other turn, a given player has priority over any other particular player
+            # self.turn_order.reverse()
+            
 
             # Update the db w/ any changes this round
             list_changes = []
@@ -913,6 +939,9 @@ class MadmiralsGameInstance:
 
                 self.parent.db.run_sql(sql)
 
+
+    
+    
     class MadCell:
         
         # ooh what about introducing tides!!! every 100 turns or so the tide goes in and out.. 'blank' cells get washed away during high tide (so growth rate is negative), ships aka cities don't produce troops during low tide (growth rate is 0), broken mtn growth rate affected by tides too (produce 0 at high tide, low at low tide?)
@@ -933,8 +962,8 @@ class MadmiralsGameInstance:
             
             self.item_id = None # one of the opensimplex.noise3array values for this cell - used to determine to spawn here - may also be used to determine admiral spawn locations
             self.item_amt = None # another noise3array value - used to determine how much of an item should be here
-
-        def update_visibility_status(self, player_id):
+        
+        def update_visibility_status(self, player_id): #TODO REFACTOR
             if not self.parent.parent.fog_of_war:
                 self.hidden = False
                 # self.cell_type_last_seen_by_player = self.cell_type # on second thought let's not
@@ -959,45 +988,3 @@ class MadmiralsGameInstance:
                 
             else:
                 self.hidden = True             
-        
-        def update_display_text(self): # TODO fix this - move it to gui and / or make it automatic
-            tide = self.parent.get_tide()
-            str_troops = self.troops if self.troops > 0 else ''
-            
-            if self.hidden:
-                if self.cell_type_last_seen_by_player is not None: #oops i think this is logically buggy TODO make this report the last cell type seen, not just the current cell type masked if it has been seen before
-                    if self.cell_type == CELL_TYPE_SHIP:
-                        self.display_text.set('C')  
-                    elif self.cell_type == CELL_TYPE_ADMIRAL:                        
-                            self.display_text.set('A')  
-                    elif self.cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
-                        self.display_text.set('M')
-                    elif self.cell_type == CELL_TYPE_SWAMP and tide != TIDE_HIGH:
-                        self.display_text.set('S')
-                    else:
-                        self.display_text.set('')
-
-                elif self.cell_type in [CELL_TYPE_SHIP, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED, CELL_TYPE_MOUNTAIN_BROKEN]:
-                    self.display_text.set('M?')
-                else:
-                    self.display_text.set('')
-
-            else:
-                if self.cell_type == CELL_TYPE_SHIP:
-                    self.display_text.set(f'C{str_troops}')  
-                elif self.cell_type == CELL_TYPE_ADMIRAL:                        
-                        self.display_text.set(f'A{str_troops}')  
-                elif self.cell_type == CELL_TYPE_MOUNTAIN:
-                    self.display_text.set('M')
-                elif self.cell_type == CELL_TYPE_MOUNTAIN_CRACKED:
-                    self.display_text.set(f'm{str_troops}')
-                elif self.cell_type == CELL_TYPE_MOUNTAIN_BROKEN:
-                    self.display_text.set(f'~{str_troops}')
-                elif self.cell_type == CELL_TYPE_SWAMP:
-                    if tide == TIDE_HIGH:
-                        self.display_text.set(f'{str_troops}')
-                    else:
-                        self.display_text.set(f'S{str_troops}')
-
-                else:
-                    self.display_text.set(f'{str_troops}')  

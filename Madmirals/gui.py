@@ -3,47 +3,20 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import colorchooser
 from functools import partial
-from PIL import Image
+from PIL import Image, ImageTk
 
 ### Project modules
 from constants import *
-
-def is_color_dark(color):
-    # Expects a hex color in format #FF00FF
-    r_val = int(color[1:3], base=16)
-    g_val = int(color[1:3], base=16)
-    b_val = int(color[1:3], base=16)
-    
-    # # Simpler approach Calculate brightness..
-    brightness = (r_val*299 + g_val*587 + b_val*114)/1000 # these seemingly arbitrary values have been used in other functions in other languages
-    # return brightness < 185 # threshold can be varied
-
-    # more sophisticatred - calculate luminance
-    r2 = r_val/255.0
-    if r2 <= 0.04045: r2 =  r2/12.92
-    else: r2 = ((r2+0.055)/1.055) ** 2.4
-
-    g2 = g_val/255.0
-    if g2 <= 0.04045: g2 =  g2/12.92
-    else: g2 = ((g2+0.055)/1.055) ** 2.4
-    
-    b2 = b_val/255.0
-    if b2 <= 0.04045: b2 =  b2/12.92
-    else: b2 = ((b2+0.055)/1.055) ** 2.4
-    
-    luminance = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2
-    
-    print(f'Color {color} has a brightness of {brightness} and luminance of {luminance}')
-    return luminance < .179 # threshold of 179 is defined by W3C reccomendation
-
-
-
+from seedy import Seedling # used to determine what the seed demands
+from image_data import * 
 
 class MadmiralsGUI:
 
     def __init__(self, parent):
         self.root = tk.Tk()
         self.root.title('Madmirals')
+
+        self.images = ImageData()
         
         self.about_window = None # self.AboutWindow(self)
         self.settings_window = None # except while open
@@ -57,8 +30,9 @@ class MadmiralsGUI:
         self.frame_win_conditions = tk.Frame(master=self.root)
 
         self.cell_font_size = DEFAULT_FONT_SIZE
-        self.apply_bindings()
+        self.label_size = DEFAULT_LABEL_SIZE
 
+        self.apply_bindings()
 
 
     class AboutWindow:
@@ -109,8 +83,8 @@ class MadmiralsGUI:
         # self.root.bind('<Button-5>', self.zoom_wheel_handler) # Linux OS support
         self.root.bind('<Control-Q>', self.quit_game)
         self.root.bind('<Control-q>', self.quit_game)
-        self.root.bind('<Control-N>', self.open_game_settings)          # WARNING this will be reversed if caps lock is on.. look into 
-        self.root.bind('<Control-n>', self.new_game)                    # bind_caps_lock = e1.bind('<Lock-KeyPress>', caps_lock_on)  
+        self.root.bind('<Control-n>', self.open_game_settings)          # WARNING this will be reversed if caps lock is on.. look into 
+        self.root.bind('<Control-N>', self.new_game)                    # bind_caps_lock = e1.bind('<Lock-KeyPress>', caps_lock_on)  
         # self.root.bind('<Control-M>', self.open_game_settings)
         # self.root.bind('<Control-m>', self.open_game_settings)
         self.root.bind('<Control-F>', self.toggle_fog_of_war)
@@ -118,7 +92,7 @@ class MadmiralsGUI:
         self.root.bind('<Control-D>', self.toggle_debug_mode)
         self.root.bind('<Control-O>', self.open_replay_window)
         self.root.bind('<Control-o>', self.open_replay_window)
-
+        
     def zoom_wheel_handler(self, event):
         # event.num for Linux, event.delta for Windows
         if event.num == 5 or event.delta == -120:
@@ -174,7 +148,7 @@ class MadmiralsGUI:
     
     def key_press_handler(self, event):
         CHAR_ESCAPE = '\x1b'
-        interesting_chars = ['W', 'w', 'A', 'a', 'S','s', 'D', 'd', 'E', 'e', CHAR_ESCAPE, '-', '=', '0']
+        interesting_chars = ['W', 'w', 'A', 'a', 'S','s', 'D', 'd', 'E', 'e', CHAR_ESCAPE, '-', '=', '0', 'P', 'p', 'Q', 'q']
         interesting_syms = ['Up', 'Down', 'Left', 'Right']
         player_id = 0 # TODO THIS NEEDS TO BE UPDATED
         
@@ -196,13 +170,22 @@ class MadmiralsGUI:
                     self.zoom_reset()
 
 
-            elif event.char in ['E', 'e']: # undo a step
-                last_action = self.parent.game.players[player_id].player_queue.pop_queued_action(-1)
+            elif event.char in ['E', 'e']: # undo most recent action in queue
+                if len(self.parent.game.players[player_id].player_queue.queue)>0:
+                    last_action = self.parent.game.players[player_id].player_queue.pop_queued_action(-1)
 
-                if last_action:
-                    self.parent.game.active_cell = last_action.source_address
-                    #print('undo event!')
+                    if last_action:
+                        self.parent.game.active_cell = last_action.source_address
+                        
 
+            elif event.char in ['P', 'p']: # undo a step
+                self.toggle_pause()
+
+            elif event.char in ['Q', 'q']: # undo a step
+            
+                self.parent.game.players[player_id].player_queue.queue.clear()
+                        
+            
             elif self.parent.game.active_cell:
                 # print(f'char {event.char} pressed. Active cell is {active_cell_address}')
             
@@ -233,8 +216,8 @@ class MadmiralsGUI:
         menubar = tk.Menu(root)
         
         filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label='New Game', command=self.new_game, accelerator='Ctrl+N')
-        filemenu.add_command(label='Game Settings', command=self.open_game_settings, accelerator='Ctrl+Shift+N')
+        filemenu.add_command(label='New Game...', command=self.open_game_settings, accelerator='Ctrl+N')
+        filemenu.add_command(label='Quick Game', command=self.new_game, accelerator='Ctrl+Shift+N')
         filemenu.add_command(label='Open Replay', command=self.open_replay_window, accelerator='Ctrl+O')
         filemenu.add_separator()
         filemenu.add_command(label='About', command=self.open_about_window)
@@ -242,6 +225,7 @@ class MadmiralsGUI:
         filemenu.add_command(label='Exit', command=self.root.quit, accelerator='Ctrl+Q')
         
         game_menu = tk.Menu(menubar, tearoff=0)
+        game_menu.add_command(label='Pause/Resume', command=self.toggle_pause, accelerator='P')
         game_menu.add_command(label='Zoom In', command=self.zoom_in, accelerator='=')
         game_menu.add_command(label='Zoom Out', command=self.zoom_out, accelerator='-')
         game_menu.add_command(label='Reset Zoom', command=self.zoom_reset, accelerator='0')
@@ -254,16 +238,28 @@ class MadmiralsGUI:
 
         return menubar
 
+    def toggle_pause(self):
+        if self.parent.game is not None:
+            if self.parent.game.game_status == GAME_STATUS_IN_PROGRESS: self.parent.game.game_status = GAME_STATUS_PAUSE
+            elif self.parent.game.game_status == GAME_STATUS_PAUSE:     self.parent.game.game_status = GAME_STATUS_IN_PROGRESS
+
     def zoom_in(self, increment=3):
         if self.cell_font_size < MAX_FONT_SIZE:
             self.cell_font_size = min(self.cell_font_size+increment, MAX_FONT_SIZE)
-                    
+        
+        if self.label_size < MAX_LABEL_SIZE:
+           self.label_size = min(self.label_size+increment*2, MAX_LABEL_SIZE)
+
     def zoom_out(self, increment=3):
         if self.cell_font_size > MIN_FONT_SIZE:
             self.cell_font_size = max(self.cell_font_size-increment, MIN_FONT_SIZE)
+        
+        if self.label_size > MIN_LABEL_SIZE:
+            self.label_size = max(self.label_size-increment*2, MIN_LABEL_SIZE)
 
     def zoom_reset(self):
         self.cell_font_size = DEFAULT_FONT_SIZE
+        self.label_size = DEFAULT_LABEL_SIZE
 
     def toggle_fog_of_war(self, event=None): # TODO move to game manager (or game?)
         if self.parent.game is not None:
@@ -329,7 +325,7 @@ class MadmiralsGUI:
 
         def populate_frame_game(self):
             f = self.frame_game
-
+            
             lbl_seed = tk.Label(f, text= 'Seed', font=('Helvetica 10 bold'))
             f.new_seed = tk.StringVar()
             f.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
@@ -338,7 +334,7 @@ class MadmiralsGUI:
             
             lbl_game_mode = tk.Label(f, text= 'Game Mode', font=('Helvetica 10 bold'))
             avail_game_modes = [
-                'Free for All',
+                'Free For All',
                 'Team Battle',
                 'Treasure Hunt',
                 'Conway\'s Game of Sealife',
@@ -346,7 +342,7 @@ class MadmiralsGUI:
             ]
 
             selected_game_mode = tk.StringVar()
-            selected_game_mode.set('Free for all')
+            selected_game_mode.set(avail_game_modes[0])
             dropdown_game_mode = tk.OptionMenu(f, selected_game_mode, *avail_game_modes)
             dropdown_game_mode.config(width=25)
             
@@ -358,9 +354,19 @@ class MadmiralsGUI:
             btn_generate_new_seed.grid(row=3,column=1, sticky='w', padx=(2, 10), pady=(2, 10))
             
         def generate_new_seed(self):
-            self.frame_game.new_seed.set(random.randint(0, 10**10)) # a random seed, same range as default 'New Game'
+            new_seed = random.randint(0, 10**10)
+            self.frame_game.new_seed.set(new_seed) # a random seed, same range as default 'New Game'
             # Update the slider values of row/col/bots if they're set to random
             # Update player color if they haven't set it yet
+
+            if self.frame_params.rows_rand_or_cust.get() == USE_DEFAULT: self.frame_params.val_rows.set(Seedling.get_num_rows(new_seed))
+            if self.frame_params.cols_rand_or_cust.get() == USE_DEFAULT: self.frame_params.val_cols.set(Seedling.get_num_cols(new_seed))
+            if self.frame_params.bots_rand_or_cust.get() == USE_DEFAULT: self.frame_params.val_bots.set(Seedling.get_num_players(new_seed) - 1) # because the prompt is # enemies, not # players
+                
+            
+            
+            
+            
 
 
         def populate_frame_player(self):
@@ -377,7 +383,6 @@ class MadmiralsGUI:
             self.player_color_fg = tk.StringVar()
             
    
-
             lbl_player = tk.Label(f, text='Player', font=('Helvetica 10 bold'))
             self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=25, bg='light green', font=('Arial 16 bold'))
     
@@ -398,7 +403,7 @@ class MadmiralsGUI:
             print(c_code)
             if c_code is not None and c_code[0] is not None:
                 bg = c_code[1]
-                fg = 'white' if is_color_dark(bg) else 'black'
+                fg = '#FFFFFF' if is_color_dark(bg) else '#000000'
                 
                 self.player_color_bg.set(bg) # we will grab this value on apply settings
                 self.player_color_fg.set(fg)
@@ -413,7 +418,7 @@ class MadmiralsGUI:
             # Reverts the user color to the one generated by the current seed
             #TODO
 
-            bg = 'white'
+            bg = '#FFFFFF'
             fg = 'dark blue'
             
             self.player_color_bg.set(bg) # we will grab this value on apply settings
@@ -445,13 +450,13 @@ class MadmiralsGUI:
                 f, orient='horizontal', showvalue=True,
                 variable=f.val_rows, command=self.slider_changed_rows,
                 from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue', 
-                tickinterval=2, length=200, sliderlength=40
+                tickinterval=5, length=200, sliderlength=40
             )
             slider_cols = tk.Scale(
                 f, orient='horizontal', showvalue=True,
                 variable=f.val_cols, command=self.slider_changed_cols,
                 from_=MIN_ROW_OR_COL, to=MAX_ROW_OR_COL, troughcolor='blue',
-                tickinterval=2, length=200, sliderlength=40
+                tickinterval=5, length=200, sliderlength=40
             )              
             
             f.bots_rand_or_cust = tk.IntVar()
@@ -542,53 +547,33 @@ class MadmiralsGUI:
         if not self.frame_game_board is None: self.frame_game_board.destroy()
         #if not canvas is None: canvas.destroy()
         
-        self.frame_game_board = tk.Frame(master=self.root, width=250, height=250)
-        canvas = tk.Canvas(self.frame_game_board, width=250, height=250, scrollregion=(0, 0, 6000, 6000))
+        self.frame_game_board = tk.Frame(master=self.root, width=250, height=250, bg=COLOR_TIDE_HIGH)
+        canvas = tk.Canvas(self.frame_game_board, width=250, height=250, scrollregion=(0, 0, 6000, 6000)) # TODO get this to work, bg=COLOR_TIDE_HIGH)
         
         hbar=tk.Scrollbar(self.frame_game_board,orient=tk.HORIZONTAL)
-        hbar.grid(row=1, column=0, sticky='ew')
         hbar.config(command=canvas.xview)
         vbar=tk.Scrollbar(self.frame_game_board,orient=tk.VERTICAL)
-        vbar.grid(row=0, column=1, sticky='ns')
         vbar.config(command=canvas.yview)
         canvas.config(width=250,height=250)
         canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
-        canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S))
-
-        #TODO STILL NOT WORKING RIGHT
-
-        # self.h_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.HORIZONTAL)
-        # self.v_bar = ttk.Scrollbar(self.frame_game_board, orient=tk.VERTICAL)
         
-        # canvas.config(width=250,height=250)
-
-        #yscrollcommand=self.v_bar.set, xscrollcommand=self.h_bar.set)
-                #canvas.configure(scrollregion=canvas.bbox("all"))
-        # canvas.config(width=300,height=300)
-        # canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
-        # canvas.pack(side=LEFT,expand=True,fill=BOTH)
-
-        # canvas = Canvas(root, scrollregion=(0, 0, 1000, 1000), yscrollcommand=v.set, xscrollcommand=h.set)
-        # h['command'] = canvas.xview
-        # v['command'] = canvas.yview
-
-        # canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S))
-        # self.h_bar.grid(column=0, row=1, sticky=(tk.W,tk.E))
-        # self.v_bar.grid(column=1, row=0, sticky=(tk.N,tk.S))
-        # self.frame_game_board.grid_columnconfigure(0, weight=1)
-        # self.frame_game_board.grid_rowconfigure(0, weight=1)
-
+        canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S), padx=(15,0),pady=(15,0),)
+        hbar.grid(row=1, column=0, sticky='ew', padx=(15,0))
+        vbar.grid(row=0, column=1, sticky='ns', pady=(15,0))
+        
         self.frame_buttons = tk.Frame(master=canvas)
-        
         self.board_cell_buttons = {}
-
+        
         for i in range(self.parent.game.num_rows):
             for j in range(self.parent.game.num_cols):
                 #self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_game_board, bg='light grey', textvariable=self.parent.game.game_board[(i,j)].display_text, width=8, height=4) # add cell to the dictionary and establish default behavior
                 self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_buttons, 
-                    textvariable=self.parent.game.game_board[(i,j)].display_text, 
-                    width=6, height=3,
-                    highlightcolor='orange'                        
+                    #textvariable=self.parent.game.game_board[(i,j)].display_text, 
+                    text='',
+                    width=250, height=250,
+                    image=self.images.image_empty, 
+                    compound=tk.CENTER
+                    # highlightcolor='orange'                        
                     ) # add cell to the dictionary and establish default behavior
                 self.board_cell_buttons[(i, j)].grid(row=i, column=j) # place the cell in the frame
 
@@ -597,7 +582,7 @@ class MadmiralsGUI:
                 self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
         
         self.frame_buttons.grid(row=0, column=0)
-        self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=15, padx=(15, 15))
+        self.frame_game_board.grid(row=0, column=0, columnspan=3, rowspan=4, pady=(15,15), padx=(15, 15), ipadx=8, ipady=8)
         self.frame_game_board.focus_set()
 
     def populate_scoreboard_frame(self):
@@ -640,8 +625,8 @@ class MadmiralsGUI:
             self.lbls_name[i].grid(row=0, column=0, sticky='ew')
             self.lbls_cells[i].grid(row=0, column=1, sticky='ew')
             self.lbls_troops[i].grid(row=0, column=2, sticky='ew')
-
-        self.frame_scoreboard.grid(row=0, column=9, sticky='n', pady=(15, 0), padx=(15,15), ipady=5)
+        
+        self.frame_scoreboard.grid(row=0, column=9, sticky='news', pady=(15, 0), padx=(15,15))
     
     def populate_win_conditions_frame(self):
         if not self.frame_win_conditions is None:
@@ -659,74 +644,84 @@ class MadmiralsGUI:
         self.lbl_win_desc.grid(row = 1, column = 0)
         self.lbl_lose_header.grid(row=2, column=0)
         self.lbl_lose_desc.grid(row = 3, column = 0)
-        self.frame_win_conditions.grid(row=1, column=9, sticky='n',  pady=(0, 0), padx=(15,15))
+        self.frame_win_conditions.grid(row=1, column=9, sticky='news',  pady=(0, 0), padx=(15,15))
     
     #def populate_tide_frame(self):
 
 
+    def get_cell_deets(self, cell, tide):
+        cell_type = cell.cell_type
+        show_troop_count_if_type = [CELL_TYPE_ADMIRAL, CELL_TYPE_SHIP, CELL_TYPE_SWAMP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4]
+
+        text = '' if cell.troops == 0 or (cell.hidden and self.parent.fog_of_war) else cell.troops
+        
+        if self.parent.fog_of_war and cell.hidden:
+            bg_color = '#222222'
+            fg_color = '#DDDDDD'
+        elif cell.owner is not None:
+            bg_color = self.parent.game.players[cell.owner].color_bg
+            fg_color = self.parent.game.players[cell.owner].color_fg
+        else:
+            
+            if cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
+                bg_color = 'dark grey'
+                fg_color = 'black'
+            elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN and tide == COLOR_TIDE_HIGH:
+                bg_color = 'dark grey'
+                fg_color = 'black'
+            elif cell_type == CELL_TYPE_SWAMP and tide == TIDE_HIGH:
+                    bg_color = COLOR_TIDE_HIGH
+                    fg_color = '#FFFFFF'
+            elif cell_type == CELL_TYPE_SWAMP and tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
+                bg_color = COLOR_SWAMP_MID_TIDE
+                fg_color = '#FFFFFF'                                    
+            elif cell_type == CELL_TYPE_SWAMP:
+                bg_color = COLOR_SWAMP
+                fg_color = 'dark grey'
+            else:
+                color = self.parent.game.get_tide_color()
+                
+                bg_color = color[0]
+                fg_color = color[1]
+                
+            
+
+        img = self.images.get_image_by_cell_type(cell.cell_type, tide) # the default icon for this cell
+        
+        if cell.hidden and cell.cell_type_last_seen_by_player is None: # override the default if we can't quite make out what's there
+            if cell_type in [CELL_TYPE_SHIP, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED, CELL_TYPE_MOUNTAIN_BROKEN]:
+                img = self.images.image_hex
+            else:
+                img = self.images.image_empty
+
+        return bg_color, fg_color, img, text
+
+
     def render(self):  
         tide = self.parent.game.get_tide()
-
+        
+        #self.frame_game_board.config(bg=self.parent.game.get_tide_color()[0]) # oops this makes the screen flicker
         if self.parent.game is not None:          
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
                     cell = self.parent.game.game_board[(i,j)]
-                    uid = cell.owner
-                    relief = tk.RAISED if self.parent.game.active_cell == (i,j) else tk.SUNKEN
-                    cell_type = cell.cell_type
-                                    
-                    if self.parent.fog_of_war and cell.hidden:
-                        bg_color = 'black'
-                        fg_color = 'grey'
-                    else:
-                        
-                        if uid is None:
-                            if cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
-                                bg_color = 'dark grey'
-                                fg_color = 'black'
-                            elif cell_type == CELL_TYPE_SWAMP:
-                                if tide == TIDE_HIGH:
-                                    bg_color = COLOR_TIDE_HIGH
-                                    fg_color = 'white'
-                                elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
-                                    bg_color = COLOR_SWAMP_MID_TIDE
-                                    fg_color = 'white'                                    
-                                else:
-                                    bg_color = COLOR_SWAMP
-                                    fg_color = 'dark grey'
-                            elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN and tide == COLOR_TIDE_HIGH:
-                                bg_color = 'dark grey'
-                                fg_color = 'black'
-                            else:
-                                if tide == TIDE_HIGH:
-                                    bg_color = COLOR_TIDE_HIGH
-                                    fg_color = 'white'
-                                elif tide == TIDE_LOW:
-                                    bg_color = COLOR_TIDE_LOW
-                                    fg_color = 'dark grey'                                
-                                elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
-                                    bg_color = COLOR_TIDE_RISING_3
-                                    fg_color = 'white'
-
-                        else:
-                            bg_color = self.parent.game.players[uid].color_bg
-                            fg_color = self.parent.game.players[uid].color_fg
                     
-
-                    #font = ('Arial 18 bold') if cell_type in [CELL_TYPE_MOUNTAIN,] else ('Arial 14')  # ooh this was a fun experiment - mountains stand out more, and clusters of non-mountains look like meadows..
+                    # set display text, color, and image
+                    bg_color, fg_color, img, text = self.get_cell_deets(cell, tide)
+                    
                     font = (f'Arial {self.cell_font_size} bold')
+                    relief = tk.RAISED if self.parent.game.active_cell == (i,j) else tk.SUNKEN
                     
-            
-                    if False: #TODO FIX img behavior and add other images
-                        img = self.assets.img_mountain if cell_type == CELL_TYPE_MOUNTAIN else None
-                    else:
-                        img = None
+                    # Shade the neigbors of active cell to draw attention to it
+                    if self.parent.game.active_cell in [(i-1,j), (i+1,j), (i,j-1), (i,j+1)]:
+                        bg_color = adjust_color_brightness(bg_color, -1)     # maybe instead / in addition change tk.sunken to tk.groove
+                        # relief = tk.GROOVE
 
+                    self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font, text=text, width=self.label_size, heigh=self.label_size)
 
-                    self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font)
-
-            
             self.update_score_board()
+
+        self.root.update_idletasks()
 
         # print('todo - if debug mode, show extra frame and update text, otherwise keep it hidden')
         #             if self.parent.debug_mode: 
@@ -769,4 +764,49 @@ class MadmiralsGUI:
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
         #print('render_game_over')
         pass
+
+
+
+
+
+
+def is_color_dark(color):
+    # Expects a hex color in format #FF00FF
+    r_val = int(color[1:3], base=16)
+    g_val = int(color[4:5], base=16)
+    b_val = int(color[6:7], base=16)
+    
+    # # Simpler approach Calculate brightness..
+    brightness = (r_val*299 + g_val*587 + b_val*114)/1000 # these seemingly arbitrary values have been used in other functions in other languages
+    # return brightness < 185 # threshold can be varied
+
+    # more sophisticatred - calculate luminance
+    r2 = r_val/255.0
+    if r2 <= 0.04045: r2 =  r2/12.92
+    else: r2 = ((r2+0.055)/1.055) ** 2.4
+
+    g2 = g_val/255.0
+    if g2 <= 0.04045: g2 =  g2/12.92
+    else: g2 = ((g2+0.055)/1.055) ** 2.4
+    
+    b2 = b_val/255.0
+    if b2 <= 0.04045: b2 =  b2/12.92
+    else: b2 = ((b2+0.055)/1.055) ** 2.4
+    
+    luminance = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2
+    
+    print(f'Color {color} has a brightness of {brightness} and luminance of {luminance}')
+    return luminance < .179 # threshold of 179 is defined by W3C reccomendation
+
+def adjust_color_brightness(color, brightness_offset):
+    try: # Expect a color string formatted ##FFFFFF
+        # print(f'testinggggg {color}')        
+        r_val = max(0, min(255, int(color[1:3], base=16) + brightness_offset))
+        g_val = max(0, min(255, int(color[4:5], base=16) + brightness_offset))
+        b_val = max(0, min(255, int(color[6:7], base=16) + brightness_offset))
+        
+        new_hex = '#{:02x}{:02x}{:02x}'.format(r_val, g_val, b_val) # massage the results into exactly 7 characters
+        return new_hex
+    except: # better luck next time. TODO remove color strings from project.. more pain than convenience for our purposes
+        return color
 
