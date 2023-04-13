@@ -26,7 +26,7 @@ class MadmiralsGameManager:
         
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
-
+        self.game_settings_changed_this_turn = True 
         # self.game.game_status = GAME_STATUS_READY
 
         self.game_loop() # start the game cycle!
@@ -63,14 +63,13 @@ class MadmiralsGameManager:
         self.gui.populate_game_board_frame()
         self.gui.populate_scoreboard_frame()
         self.gui.populate_tide_frame()
-        
         self.gui.populate_win_conditions_frame()
-###        self.gui.populate_tide_frame()
         
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
 
         self.game.game_status = GAME_STATUS_IN_PROGRESS
+        self.game_settings_changed_this_turn = True 
 
         self.game_loop() # start the game cycle!
 
@@ -91,20 +90,23 @@ class MadmiralsGameManager:
                 
                 if  (now - self.last_turn_timestamp) >= self.GAME_TURN_SPEED:
                     self.last_turn_timestamp = now
-                    self.game.advance_game_turn()
+                    self.game.tick()
                             
                 self.gui.render()
+                self.game_settings_changed_this_turn = False # eg zoom, end of game, change of tide.. if so, we will render everything
 
-                # if self.game.turn > 5:
-                #     self.game.game_status = GAME_STATUS_GAME_OVER_WIN
-            
-            else:
+            elif self.game.game_status == GAME_STATUS_PAUSE:
+                #print('paused')
+                pass
+            elif self.game.game_status in (GAME_STATUS_GAME_OVER_LOSE, GAME_STATUS_GAME_OVER_LOSE):
+                print('here')
                 self.gui.render_game_over()
+            else:
+                pass
             
         self.after_id = self.gui.root.after(self.CYCLE_SPEED, self.game_loop) #try again in (at least) X ms
 
 
-  
 if __name__ == '__main__':
     game = MadmiralsGameManager() # Create/load the game logic and assets and open the connection to the DB
     game.gui.root.mainloop() # run the tkinter loop

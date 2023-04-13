@@ -21,8 +21,7 @@ class MadmiralsGUI:
 
         self.root.config(menu=self.create_menu_bar(self.root))
         self.parent = parent
-        self.assets = self.GUI_Assets(r'C:\Users\thema\Documents\Python Scripts\Madmirals\assets\\') # TODO TEMP! 
-    
+        
         self.frame_game_board = tk.Frame(master=self.root)
         self.frame_scoreboard = tk.Frame(master=self.root)
         self.frame_tide_chart = tk.Frame(master=self.root)        
@@ -84,6 +83,8 @@ class MadmiralsGUI:
         self.root.bind('<Control-O>', self.open_replay_window)
         self.root.bind('<Control-o>', self.open_replay_window)
         
+        
+        
     def zoom_wheel_handler(self, event):
         # event.num for Linux, event.delta for Windows
         if event.num == 5 or event.delta == -120:
@@ -92,21 +93,28 @@ class MadmiralsGUI:
             self.zoom_in(increment=1)            
 
     def quit_game(self, event=None):
-        print('test')
+        print('Goodbye.')
         self.root.destroy()
 
     def quick_game(self, event=None):
-        num_rows = None
-        num_cols = None
-        num_players = None
-        seed = None 
-        game_mode = GAME_MODE_FFA
-        
-        player_color = None
-        player_name = 'PLAYER 1'
-        if self.parent.game is not None:
+        if self.parent.game is None:
+            num_rows = None
+            num_cols = None
+            num_players = None
+            seed = None 
+            game_mode = GAME_MODE_FFA
+            
+            player_color = None
+            player_name = 'PLAYER 1'
+        else:
             player_name = self.parent.game.players[0].user_desc 
-        #     player_name = (self.parent.game.players[0].color_bg, self.parent.game.players[0].color_fg)
+            num_rows = self.parent.game.num_rows
+            num_cols = self.parent.game.num_cols
+            num_players = self.parent.game.num_players
+            player_color = self.parent.game.player_color
+            # player_color= self.parent.game.players[0].color_bg
+            seed = None
+            game_mode = GAME_MODE_FFA
 
         self.parent.create_new_game(num_rows=num_rows, num_cols=num_cols, num_players=num_players, seed=seed, game_mode=game_mode, player_color=player_color, 
             player_name=player_name)            
@@ -114,19 +122,8 @@ class MadmiralsGUI:
         print('withdraw')
         self.frame_splash_screen.grid_remove()
 
-    class GUI_Assets: 
-        MAGIC_NUM_TO_FIX_CELL_SIZE = 5 # tk.Button seems to add 5 px to the height and width 
-        
-        def __init__(self, dir_img):                
-            self.img_mountain   = tk.PhotoImage(file=f'{dir_img}mountain.gif')    
-            self.img_swamp      = tk.PhotoImage(file=f'{dir_img}swamp.gif')    
-
-            self.cell_width = self.img_mountain.width() + self.MAGIC_NUM_TO_FIX_CELL_SIZE # assumes all cell images are identically sized
-            self.cell_height = self.img_mountain.height() + self.MAGIC_NUM_TO_FIX_CELL_SIZE
-        
-
     def btn_left_click(self, address, event):
-        self.parent.game.active_cell = address
+        self.parent.game.move_active_cell(new_address=address)
         player_id = 0
         self.parent.game.players[player_id].commando_mode = False
             
@@ -170,7 +167,6 @@ class MadmiralsGUI:
                 else:
                     self.zoom_reset()
 
-
             elif event.char in ['E', 'e']: # undo most recent action in queue
                 if len(self.parent.game.players[player_id].player_queue.queue)>0:
                     last_action = self.parent.game.players[player_id].player_queue.pop_queued_action(-1)
@@ -178,15 +174,12 @@ class MadmiralsGUI:
                     if last_action:
                         self.parent.game.active_cell = last_action.source_address
                         
-
             elif event.char in ['P', 'p']: # undo a step
                 self.toggle_pause()
 
             elif event.char in ['Q', 'q']: # undo a step
-            
                 self.parent.game.players[player_id].player_queue.queue.clear()
                         
-            
             elif self.parent.game.active_cell:
                 # print(f'char {event.char} pressed. Active cell is {active_cell_address}')
             
@@ -200,22 +193,13 @@ class MadmiralsGUI:
                 if self.parent.game.players[player_id].right_click_pending_address == active_cell_address:
                     action = ACTION_MOVE_HALF
                 elif self.parent.game.players[player_id].commando_mode:
-                    list_ship_cell_types = [CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4]
-                    if self.parent.game.game_board[active_cell_address].cell_type in list_ship_cell_types:
-                        action = ACTION_MOVE_CITY # downstread we will override this when crossing admirals/cities
-                    else:
-                        action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/cities
+                    action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/cities
                 else:
-                    list_ship_cell_types = [CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4]
-                    if self.parent.game.game_board[active_cell_address].cell_type in list_ship_cell_types:
-                        action = ACTION_MOVE_CITY # downstread we will override this when crossing admirals/cities
-                        print('ehlloo?')
-                    else:
-                        action = ACTION_MOVE_NORMAL
+                    action = ACTION_MOVE_NORMAL
         
                 self.parent.game.players[player_id].player_queue.add_action_to_queue(active_cell_address, action, dir) 
 
-                self.parent.game.move_active_cell(dir)
+                self.parent.game.move_active_cell(dir=dir)
                 self.parent.game.players[player_id].right_click_pending_address = None
             
     def create_menu_bar(self, root):
@@ -284,18 +268,66 @@ class MadmiralsGUI:
         print(f'Set debug mode to {self.parent.debug_mode}')
 
     def open_replay_window(self, event=None):
+        if self.parent.game is not None and self.parent.game.game_status == GAME_STATUS_IN_PROGRESS:
+            self.parent.game.game_status = GAME_STATUS_PAUSE        
         # TODO use top.withdraw() and top.deiconify() to hide/show windows
         print('Open replay')
-        # TODO add a window w/ list of replays and other options
-        game_id = 1543
-
-        self.parent.create_new_replay_game(game_id=game_id)     
+        self.replay_window = self.ReplayWindow(self)
+        
+        
+        
+        # # TODO add a window w/ list of replays and other options
+        # game_id = 5
+        # self.parent.create_new_replay_game(game_id=game_id)     
     
     def open_game_settings(self, event=None):
         if self.parent.game is not None and self.parent.game.game_status == GAME_STATUS_IN_PROGRESS:
             self.parent.game.game_status = GAME_STATUS_PAUSE
 
         self.settings_window = self.SettingsWindow(self)
+
+
+    class ReplayWindow:
+        def __init__(self, parent):
+            self.parent = parent 
+            self.top = tk.Toplevel(self.parent.root) 
+            self.top.transient()
+            self.top.title('Replays')
+            self.f_gui = tk.Frame(self.top, bg=COLOR_TIDE_LOW)
+            self.define_layout()
+            self.top.bind('<Return>', self.select_replay)
+            self.top.grab_set()
+
+        def select_replay(self):
+            print('Open replay!')
+        
+        def cancel_replay(self):
+            if self.parent.parent.game is not None and self.parent.parent.game.game_status == GAME_STATUS_PAUSE:
+                self.parent.parent.game.game_status = GAME_STATUS_IN_PROGRESS
+
+            self.top.destroy()
+
+        def define_layout(self):            
+            lbl_header = tk.Label(self.f_gui, text='Replay Selector', font=('Arial 10 bold'))
+
+            #frame_player = self.get_frame_player()
+            self.frame_game_list = tk.Frame(self.f_gui, highlightbackground='black', highlightthickness=2)
+            
+            self.pop_frame_game_list()
+            btn_ok = tk.Button(master=self.f_gui, text='OK', width=14, height=2, command=self.select_replay, bg='light blue')
+            btn_cancel = tk.Button(self.f_gui, text='Cancel', width=14, height=2, command=self.cancel_replay, bg='light blue')
+
+            lbl_header.grid(row=0, column=0, padx=10, pady=10)
+            
+            self.frame_game_list.grid(row=1, column=0, padx=10, pady=10, sticky='news')
+            
+            btn_ok.grid(row=3, column=0, padx=10, pady=10, stick='e')
+            btn_cancel.grid(row=3, column=1, padx=10, pady=10, sticky='w')
+
+            self.f_gui.pack()
+        
+        def pop_frame_game_list(self):
+            print('TODO query list of past games')
 
     class SettingsWindow:
         def __init__(self, parent):
@@ -305,9 +337,12 @@ class MadmiralsGUI:
             self.top.title('New Game Settings')
             self.f_gui = tk.Frame(self.top, bg=COLOR_TIDE_LOW)
             self.define_layout()
-            self.assign_imitial_vals()
+            self.assign_initial_vals()
 
-        def assign_imitial_vals(self):
+            self.top.bind('<Return>', self.apply_settings)
+            self.top.grab_set()
+
+        def assign_initial_vals(self):
             seed = random.randint(0, 10**10)
             self.frame_game.new_seed.set(seed) # a random seed, same range as default 'New Game'
             
@@ -399,7 +434,7 @@ class MadmiralsGUI:
             self.player_color_fg = tk.StringVar()
             
             bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
-            fg = '#FFFFFF' if is_color_dark(bg) else '#000000'
+            fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
             self.player_color_bg.set(bg)
             self.player_color_fg.set(fg)            
    
@@ -423,27 +458,22 @@ class MadmiralsGUI:
             print(c_code)
             if c_code is not None and c_code[0] is not None:
                 bg = c_code[1]
-                fg = '#FFFFFF' if is_color_dark(bg) else '#000000'
+                fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
                 
                 self.player_color_bg.set(bg) # we will grab this value on apply settings
                 self.player_color_fg.set(fg)
 
                 self.player_name_entry.config(bg=bg, fg=fg) #TODO HERE MOVE THIS ENTRY TO settingdwindow
-                # self.player_has_set_a_custom_color = True
-                
-                # print(is_color_dark(c_code[1]))
 
         def reset_user_color(self):
             bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
-            fg = '#FFFFFF' if is_color_dark(bg) else '#000000'
+            fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
             
             self.player_color_bg.set(bg) # we will grab this value on apply settings
             self.player_color_fg.set(fg)
 
             self.player_name_entry.config(bg=bg, fg=fg)
-            # self.player_has_set_a_custom_color = False
-
-                # print(is_color_dark(c_code[1]))                
+               
 
         def pop_sett_frame_params(self):
             f = self.frame_params
@@ -525,7 +555,7 @@ class MadmiralsGUI:
             # Tides checkbox
             # Duration: High    Low     Transition
     
-        def apply_settings(self):
+        def apply_settings(self, event=None):
             # Validate input; if valid, create a new instance of game with the passed params then kill this window
 
             num_players = int((self.frame_params.val_bots.get()+1)) if self.frame_params.bots_rand_or_cust.get() == USE_CUST else None
@@ -613,7 +643,7 @@ class MadmiralsGUI:
                 self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_buttons, 
                     #textvariable=self.parent.game.game_board[(i,j)].display_text, 
                     text='',
-                    width=250, height=250,
+                    width=50, height=50,
                     image=self.images.image_empty, 
                     compound=tk.CENTER #,
                     # highlightthickness=5,
@@ -642,35 +672,70 @@ class MadmiralsGUI:
         self.lbl_turn_count = tk.Label(master=self.frame_scoreboard, text='Turn 0', font=('Arial 18 bold'))
         self.lbl_turn_count.grid(row = 1, column = 0)
 
+
+
         self.bg_frames = []
 
         self.lbls_name = []
         self.lbls_cells = []
+        self.lbls_admirals = []
+        self.lbls_ships = []
         self.lbls_troops = []
+        
 
         name_label_width = SCORE_BOARD_WIDTH_NAME_MIN
         for i in range(self.parent.game.num_players):
             if len(self.parent.game.players[i].user_desc) > name_label_width:
                 name_label_width = min(len(self.parent.game.players[i].user_desc), SCORE_BOARD_WIDTH_NAME_MAX)
-
         # print(f'Decided on a scoreboard width of {name_label_width}')
-            
-        ROW_OFFSET = 2
+        
+
+
+        
+        self.frame_score_header = tk.Frame(master=self.frame_scoreboard)
+        # tk.Label(master=self.frame_score_header, text=f'player', width=name_label_width, font=('Arial 16 bold'), anchor='w').grid(row=1, column=1, sticky='w')
+        # self.lblheader_cells = tk.Label(master=self.frame_score_header, text=f'Size', width=SCORE_BOARD_WIDTH_LAND, font=('Arial 16 bold'), anchor='e'))
+        # self.lblheader_admirals = tk.Label(master=self.frame_score_header, text=f'Admirals {i}', width=SCORE_BOARD_WIDTH_ADMIRALS, font=('Arial 16 bold'), anchor='e'))
+        # self.lblheader_ships = tk.Label(master=self.frame_score_header, text=f'Ships {i}', width=SCORE_BOARD_WIDTH_SHIPS, font=('Arial 16 bold'), anchor='e'))                        
+        # self.lblheader_troops = tk.Label(master=self.frame_score_header, text=f'Troops {i}', width=SCORE_BOARD_WIDTH_TROOPS, font=('Arial 16 bold'), anchor='e'))
+
+        # .grid(row=i + ROW_OFFSET, column=0, sticky='w')
+
+
+        self.frame_score_header = tk.Frame(master=self.frame_scoreboard)
+        #self.lblheader_name = tk.Label(master=self.frame_score_header, text=f'player', width=name_label_width, font=('Arial 16 bold'), anchor='w')
+        tk.Label(master=self.frame_score_header, text=f'Player', width=name_label_width, font=('Arial 16 bold'), anchor='w').grid(row=0, column=0)
+        tk.Label(master=self.frame_score_header, text=f'Cells', width=SCORE_BOARD_WIDTH_LAND, font=('Arial 16 bold'), anchor='e').grid(row=0, column=1)
+        tk.Label(master=self.frame_score_header, text=f'Adm', width=SCORE_BOARD_WIDTH_ADMIRALS, font=('Arial 16 bold'), anchor='e').grid(row=0, column=2)
+        tk.Label(master=self.frame_score_header, text=f'Ships', width=SCORE_BOARD_WIDTH_SHIPS, font=('Arial 16 bold'), anchor='e').grid(row=0, column=3)                        
+        tk.Label(master=self.frame_score_header, text=f'Troops', width=SCORE_BOARD_WIDTH_TROOPS, font=('Arial 16 bold'), anchor='e').grid(row=0, column=4)
+
+        self.frame_score_header.grid(row=2, column=0, sticky='w')
+
+
+
+        ROW_OFFSET_SCOREBOARD_PLAYERS = 3
         for i in range(self.parent.game.num_players):
             self.bg_frames.append(tk.Frame(master=self.frame_scoreboard))
             self.lbls_name.append(tk.Label(master=self.bg_frames[i], text=f'player {i}', width=name_label_width, font=('Arial 16 bold'), anchor='w'))
             self.lbls_cells.append(tk.Label(master=self.bg_frames[i], text=f'cells {i}', width=SCORE_BOARD_WIDTH_LAND, font=('Arial 16 bold'), anchor='e'))
+            self.lbls_admirals.append(tk.Label(master=self.bg_frames[i], text=f'admirals {i}', width=SCORE_BOARD_WIDTH_ADMIRALS, font=('Arial 16 bold'), anchor='e'))
+            self.lbls_ships.append(tk.Label(master=self.bg_frames[i], text=f'ships {i}', width=SCORE_BOARD_WIDTH_SHIPS, font=('Arial 16 bold'), anchor='e'))                        
             self.lbls_troops.append(tk.Label(master=self.bg_frames[i], text=f'troops {i}', width=SCORE_BOARD_WIDTH_TROOPS, font=('Arial 16 bold'), anchor='e'))
 
             self.lbls_name[i].grid_propagate(0)
             self.lbls_cells[i].grid_propagate(0)
+            self.lbls_admirals[i].grid_propagate(0)
+            self.lbls_ships[i].grid_propagate(0)
             self.lbls_troops[i].grid_propagate(0)
             
-            self.bg_frames[i].grid(row=i + ROW_OFFSET, column=0, sticky='w')
+            self.bg_frames[i].grid(row=i + ROW_OFFSET_SCOREBOARD_PLAYERS, column=0, sticky='w')
             #self. columnconfigure(1, weight=1)
             self.lbls_name[i].grid(row=0, column=0, sticky='ew')
             self.lbls_cells[i].grid(row=0, column=1, sticky='ew')
-            self.lbls_troops[i].grid(row=0, column=2, sticky='ew')
+            self.lbls_admirals[i].grid(row=0, column=2, sticky='ew')
+            self.lbls_ships[i].grid(row=0, column=3, sticky='ew')
+            self.lbls_troops[i].grid(row=0, column=4, sticky='ew')
         
         self.frame_scoreboard.grid(row=0, column=9, sticky='news', pady=(15, 0), padx=(15,15))
     
@@ -723,104 +788,187 @@ class MadmiralsGUI:
         turn = self.parent.game.turn
 
         #show_troop_count_if_type = [CELL_TYPE_ADMIRAL, CELL_TYPE_SHIP, CELL_TYPE_SWAMP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4]
-        text = '' if cell.troops == 0 or (cell.hidden and self.parent.fog_of_war) else cell.troops
-        font = (f'Arial {self.cell_font_size} bold')
-            
-        if self.parent.fog_of_war and cell.hidden:
+        
+        is_visible = not (self.parent.fog_of_war and cell.hidden)
+        if not is_visible:
+            icon_color = '#222222'
             bg_color = '#222222'
             fg_color = '#DDDDDD'
             
         elif cell.owner is not None:
-            bg_color = self.parent.game.players[cell.owner].color_bg
+            icon_color = self.parent.game.players[cell.owner].color_bg
             fg_color = self.parent.game.players[cell.owner].color_fg 
-            
+            bg_color = '#FFFFFF'
+            #bg_color = None
 
         else:
             
+
             if cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
-                bg_color = 'dark grey'
-                fg_color = 'black'
+                icon_color = 'dark grey'
+                bg_color = tide_color
+                fg_color = 'white'
             elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN and tide == COLOR_TIDE_HIGH:
-                bg_color = 'dark grey'
-                fg_color = 'black'
+                icon_color = 'dark grey'
+                bg_color = tide_color
+                fg_color = 'white'
             elif cell_type == CELL_TYPE_SWAMP and tide == TIDE_HIGH:
-                    bg_color = COLOR_TIDE_HIGH
+                    icon_color = COLOR_TIDE_HIGH
+                    bg_color = tide_color
                     fg_color = '#FFFFFF'
             elif cell_type == CELL_TYPE_SWAMP and tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
-                bg_color = COLOR_SWAMP_MID_TIDE
+                icon_color = COLOR_SWAMP_MID_TIDE
+                bg_color = tide_color
                 fg_color = '#FFFFFF'                                    
             elif cell_type == CELL_TYPE_SWAMP:
-                bg_color = COLOR_SWAMP
+                icon_color = COLOR_SWAMP
+                bg_color = tide_color
                 fg_color = 'dark grey'
             else:
-                color = self.parent.game.get_tide_color()
                 
-                bg_color = color[0]
-                fg_color = color[1]
+                icon_color = 'white'
+                bg_color = tide_color
+                fg_color = 'black'
             
-        
         if cell.owner is not None:
-            highlightbackground  = self.parent.game.players[cell.owner].color_bg
+            highlightbackground  = None # self.parent.game.players[cell.owner].color_bg
         else:
-            highlightbackground  = bg_color
+            highlightbackground  = icon_color
             
-            
-
         relief = tk.RAISED if self.parent.game.active_cell == (cell.row, cell.col) else tk.SUNKEN
         
         # Shade the neigbors of active cell to draw attention to it
         if self.parent.game.active_cell in [(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]:
-            bg_color = adjust_color_brightness(bg_color, -10)     # maybe instead / in addition change tk.sunken to tk.groove
+            bg_color = self.adjust_color_brightness(bg_color, -10)     # maybe instead / in addition change tk.sunken to tk.groove
             relief = tk.GROOVE
         
         # An attempt at making waves -- maybe not worth it just yet.. perhaps use a chance to change image to new value
         # elif cell_type == CELL_TYPE_BLANK and not cell.hidden and (cell.row**3+cell.col**2+1) % (turn+1) == 0:
         #     relief = tk.GROOVE
 
-        img = self.images.get_image_by_cell_type(cell.cell_type, tide) # the default icon for this cell
+        secondary_color = 'white'
+        # is_visible = not (self.parent.fog_of_war and cell.hidden)
+
+        # cell.img = self.images.get_image_icon(cell.cell_type, tide_color, is_visible=is_visible, owner_color=None, secondary_color=secondary_color)
+
+        cell.img = self.images.get_image_by_cell_type(cell.cell_type, tide, cell.owner, icon_color, secondary_color, tide) # the default icon for this cell
         
         if cell.hidden and cell.cell_type_last_seen_by_player is None and self.parent.fog_of_war: # override the default if we can't quite make out what's there
             if cell_type in [CELL_TYPE_SHIP, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:#, CELL_TYPE_MOUNTAIN_BROKEN]:
-                img = self.images.image_unknown
+                cell.img = self.images.image_unknown
             else:
-                img = self.images.image_empty
+                cell.img = self.images.image_empty
 
-        return bg_color, fg_color, img, text, relief, font, highlightbackground 
+        return bg_color, fg_color, cell.img, text, relief, font, highlightbackground 
+
+    def cell_is_in_crosshairs(self, cell, incl_prev_active_cell=True):
+        
+        near_active_cell = self.parent.game.active_cell in [(cell.row,cell.col) ,(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]
+        
+        if incl_prev_active_cell:
+            near_prev_cell = self.parent.game.active_cell_prev in [(cell.row,cell.col) ,(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]
+            return near_active_cell or near_prev_cell
+        else:
+            return near_active_cell
+        
+    def render_cell(self, cell_address, render_all_cells, tide):
+        cell = self.parent.game.game_board[cell_address]
+        
+        if render_all_cells or cell.changed_this_turn or self.cell_is_in_crosshairs(cell):
+        #if True:
+            font = (f'Arial {self.cell_font_size} bold')
+            text = '' if cell.troops == 0 or (cell.hidden and self.parent.fog_of_war) else cell.troops
+            tide_color = self.parent.game.get_tide_color()[0]
+            is_visible = not (self.parent.fog_of_war and cell.hidden)
+            
+            if cell.cell_type == CELL_TYPE_SWAMP and tide != TIDE_HIGH: # at mid and low tides, we want to distinguish swamps from other territory
+                if tide == TIDE_LOW: bg_color = COLOR_SWAMP
+                elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT): bg_color = COLOR_SWAMP_MID_TIDE
+
+            
+            # Determine exactly which colors to use in this cell, this turn
+            bg_color = tide_color
+
+            if not is_visible:
+                bg_color = '#222222'
+                icon_color = '#BBBBBB'
+                fg_color = '#FFFFFF'
+                is_owned = False
+
+            elif cell.owner is None:
+                
+                icon_color = '#BBBBBB'
+                fg_color = '#FFFFFF'
+                is_owned = False
+
+                
+                if cell.cell_type == CELL_TYPE_SWAMP and tide != TIDE_HIGH: # at mid and low tides, we want to distinguish swamps from other territory
+                    if tide == TIDE_LOW: bg_color = COLOR_SWAMP
+                    elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT): bg_color = COLOR_SWAMP_MID_TIDE
+            
+            else:
+                icon_color = self.parent.game.players[cell.owner].color_bg
+                fg_color = self.parent.game.players[cell.owner].color_fg 
+                is_owned = True
+
+            # Lighten the cell it's the active (currently selected) cell to bring attention to it
+            # Also darken the cell if it's adjacent to the active cell
+            if self.parent.game.active_cell == cell_address:
+                bg_color = self.adjust_color_brightness(bg_color, +50)     # maybe instead / in addition change tk.sunken to tk.groove
+            elif self.parent.game.active_cell in [(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]:
+                bg_color = self.adjust_color_brightness(bg_color, -50)     # maybe instead / in addition change tk.sunken to tk.groove
+                # relief = tk.GROOVE
+        
+
+                
+#            img = cell.img
+
+            secondary_color='#FFFFFF' 
+            cell.img = self.images.get_image_by_cell_type(cell.cell_type, icon_color, secondary_color, is_owned, tide, is_visible) # the default icon for this cell
+
+            self.board_cell_buttons[cell_address].config(
+                font=font, text=text, bg=bg_color, fg=fg_color, image=cell.img, 
+                width=self.label_size, height=self.label_size,         
+            )
 
 
+            # bg_color # tide color unless
+            # fg_color # white or black or grey, depending 
+            # img # depends on cell type, tide, fog of war, and player color
+
+            # set display text, color, and image
+            # bg_color, fg_color, img, text, relief, font, highlightbackground  = self.get_cell_deets(cell, tide)
+            
+            # #self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font, text=text, width=self.label_size, height=self.label_size, highlightbackground=highlightbackground )
+            # self.board_cell_buttons[cell_address].config(
+            #     bg=bg_color, fg=fg_color, relief=relief, image=img, 
+            #     font=font, text=text, width=self.label_size, height=self.label_size, 
+                    
+            # )
+            return True # tell the calling function that we did render this cell this turn
+        else:
+            return False
+        
     def render(self):  
         tide = self.parent.game.get_tide()
         new_tide = self.parent.game.tide_just_changed_to()
         
         render_all_cells = self.parent.game_settings_changed_this_turn or new_tide is not None
         
-        list_rendered_this_turn = []
+        #list_rendered_this_turn = []
         if self.parent.game is not None:          
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
-                    cell = self.parent.game.game_board[(i,j)]
+                    cell_added = self.render_cell((i,j),render_all_cells, tide)
+                     
+                    #if cell_added: list_rendered_this_turn.append((i, j))
 
-                    if render_all_cells or cell.changed_this_turn:
-                        list_rendered_this_turn.append((i, j))
-                        
-                        
-                        # set display text, color, and image
-                        bg_color, fg_color, img, text, relief, font, highlightbackground  = self.get_cell_deets(cell, tide)
-                        
-                        #self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font, text=text, width=self.label_size, height=self.label_size, highlightbackground=highlightbackground )
-                        self.board_cell_buttons[(i, j)].config(
-                            bg=bg_color, fg=fg_color, relief=relief, image=img, 
-                            font=font, text=text, width=self.label_size, height=self.label_size, 
-                            #highlightbackground=highlightbackground 
-                        )
-
-            # print(f'Rendered: {list_rendered_this_turn}')
+            #print(f'Rendered: {len(list_rendered_this_turn)}')
             self.update_score_board()
             self.update_tide_chart()
             
             if render_all_cells:
-                self.update_game_board_frame_bg()
-            
+                self.update_game_board_frame_bg()          
 
         self.root.update_idletasks()
 
@@ -833,7 +981,10 @@ class MadmiralsGUI:
     def update_score_board(self):
         dict_names = {}
         dict_land = {}
+        dict_admirals = {}
+        dict_ships = {}
         dict_troops = {}
+        
         players = self.parent.game.players
 
         # Update turn count
@@ -845,6 +996,8 @@ class MadmiralsGUI:
             uid = players[i].user_id
             dict_names[uid] = players[i].user_desc
             dict_land[uid] = players[i].land
+            dict_admirals[uid] =players[i].admirals
+            dict_ships[uid] = players[i].ships        
             dict_troops[uid] = players[i].troops
 
             if players[i].active:
@@ -854,9 +1007,11 @@ class MadmiralsGUI:
                 bg = 'light grey'
                 fg = 'dark grey'
             
-            self.bg_frames[score_i].configure(bg='green')
+            #self.bg_frames[score_i].configure(bg='green')
             self.lbls_name[score_i].configure(text=dict_names[uid], bg=bg, fg=fg)
             self.lbls_cells[score_i].configure(text=dict_land[uid], bg=bg, fg=fg)
+            self.lbls_admirals[score_i].configure(text=dict_admirals[uid], bg=bg, fg=fg)
+            self.lbls_ships[score_i].configure(text=dict_ships[uid], bg=bg, fg=fg)
             self.lbls_troops[score_i].configure(text=dict_troops[uid], bg=bg, fg=fg)
             
             
@@ -877,47 +1032,45 @@ class MadmiralsGUI:
         self.frame_game_board.config(bg=self.parent.game.get_tide_color()[0])
         
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
-        print('TODO render_game_over')
+        print('game over, man')
         pass
-
-
-
-def is_color_dark(color):
-    # Expects a hex color in format #FF00FF
-    r_val = int(color[1:3], base=16)
-    g_val = int(color[4:5], base=16)
-    b_val = int(color[6:7], base=16)
     
-    # # Simpler approach Calculate brightness..
-    brightness = (r_val*299 + g_val*587 + b_val*114)/1000 # these seemingly arbitrary values have been used in other functions in other languages
-    # return brightness < 185 # threshold can be varied
-
-    # more sophisticatred - calculate luminance
-    r2 = r_val/255.0
-    if r2 <= 0.04045: r2 =  r2/12.92
-    else: r2 = ((r2+0.055)/1.055) ** 2.4
-
-    g2 = g_val/255.0
-    if g2 <= 0.04045: g2 =  g2/12.92
-    else: g2 = ((g2+0.055)/1.055) ** 2.4
-    
-    b2 = b_val/255.0
-    if b2 <= 0.04045: b2 =  b2/12.92
-    else: b2 = ((b2+0.055)/1.055) ** 2.4
-    
-    luminance = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2
-    
-    print(f'Color {color} has a brightness of {brightness} and luminance of {luminance}')
-    return luminance < .179 # threshold of 179 is defined by W3C reccomendation
-
-def adjust_color_brightness(color, brightness_offset):
-    try: # Expect a color string formatted ##FFFFFF
-        r_val = max(0, min(255, int(color[1:3], base=16) + brightness_offset))
-        g_val = max(0, min(255, int(color[3:5], base=16) + brightness_offset))
-        b_val = max(0, min(255, int(color[5:7], base=16) + brightness_offset))
+       
+    def is_color_dark(self, color):
+    # Takes a color formatted like #FF00FF and tries to determine whether the color is 'dark' or not
+        r_val = int(color[1:3], base=16)
+        g_val = int(color[4:5], base=16)
+        b_val = int(color[6:7], base=16)
         
-        new_hex = '#{:02x}{:02x}{:02x}'.format(r_val, g_val, b_val) # massage the results into exactly 7 characters
-        return new_hex
-    except: # better luck next time. TODO remove color strings from project.. more pain than convenience for our purposes
-        return color
+        # # Simpler approach Calculate brightness..
+        # brightness = (r_val*299 + g_val*587 + b_val*114)/1000 # these seemingly arbitrary values have been derived for use in other languages
+        # return brightness < 185 # threshold can be varied
 
+        # more sophisticatred - calculate luminance
+        r2 = r_val/255.0
+        if r2 <= 0.04045: r2 =  r2/12.92
+        else: r2 = ((r2+0.055)/1.055) ** 2.4
+
+        g2 = g_val/255.0
+        if g2 <= 0.04045: g2 =  g2/12.92
+        else: g2 = ((g2+0.055)/1.055) ** 2.4
+        
+        b2 = b_val/255.0
+        if b2 <= 0.04045: b2 =  b2/12.92
+        else: b2 = ((b2+0.055)/1.055) ** 2.4
+        
+        luminance = 0.2126 * r2 + 0.7152 * g2 + 0.0722 * b2
+        
+        # print(f'Color {color} has a brightness of {brightness} and luminance of {luminance}')
+        return luminance < .179 # threshold of 179 is defined by W3C recommendation
+
+    def adjust_color_brightness(self, color, brightness_offset):
+        try: # Expect a color string formatted ##FFFFFF
+            r_val = max(0, min(255, int(color[1:3], base=16) + brightness_offset))
+            g_val = max(0, min(255, int(color[3:5], base=16) + brightness_offset))
+            b_val = max(0, min(255, int(color[5:7], base=16) + brightness_offset))
+            
+            new_hex = '#{:02x}{:02x}{:02x}'.format(r_val, g_val, b_val) # massage the results into exactly 7 characters
+            return new_hex
+        except: # better luck next time. TODO remove color strings from project.. more pain than convenience for our purposes
+            return color
