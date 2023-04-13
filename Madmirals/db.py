@@ -8,7 +8,7 @@ class MadDBConnection:
     def create_new_db(self, default_bot_names, default_colors):
         # Create the core database tables
         self.cur.execute('CREATE TABLE log_games(game_id INTEGER NOT NULL PRIMARY KEY, seed INTEGER, num_rows INTEGER, num_cols INTEGER, num_players INTEGER, winner TEXT, game_status TEXT)') # , num_turns, winner, start_time, end_time)')
-        self.cur.execute('CREATE TABLE log_game_moves(move_id INTEGER NOT NULL PRIMARY KEY, game_id INTEGER, turn_num INTEGER, row INTEGER, col INTEGER, cell_type INTEGER, player_id INTEGER, troops INTEGER)')
+        self.cur.execute('CREATE TABLE log_game_moves(move_id INTEGER NOT NULL PRIMARY KEY, game_id INTEGER, turn_num INTEGER, row INTEGER, col INTEGER, terrain_type INTEGER, entity_type INTEGER, player_id INTEGER, troops INTEGER)')
         self.cur.execute('CREATE TABLE log_game_entities(game_entity_id INTEGER NOT NULL PRIMARY KEY, game_id INTEGER, player_id INTEGER, player_name TEXT, bg TEXT, fg TEXT)')
         self.cur.execute('CREATE TABLE players(player_id INTEGER NOT NULL PRIMARY KEY, player_name TEXT, creation_date TEXT)')
         self.cur.execute('CREATE TABLE bot_names(bot_name_id INTEGER PRIMARY KEY, bot_name TEXT)')

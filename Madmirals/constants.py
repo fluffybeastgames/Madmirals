@@ -7,22 +7,34 @@ DIR_RIGHT = 4
 DIR_NOWHERE = -1
 
 ### Cell Type - describes the appearance and behavior of a MadCell object
-CELL_TYPE_BLANK = 0
-CELL_TYPE_ADMIRAL = 1 # fastest growth rate, regardless of tide. One is by default assigned to each entity, and can also be created by combining 5 ships into 1
-CELL_TYPE_MOUNTAIN = 2
-CELL_TYPE_SHIP = 3
-CELL_TYPE_SHIP_2 = 32 # combine 2 ships to make this. Increased growth rate
-CELL_TYPE_SHIP_3 = 33 # combine 1 ship_2 with a ship to make this. Increased growth rate
-CELL_TYPE_SHIP_4 = 34 # combine 2 ship_2s or 1 ship_3 and 1 ship to make this. Increased growth rate
-CELL_TYPE_SWAMP = 4
-CELL_TYPE_MOUNTAIN_CRACKED = 5
-CELL_TYPE_MOUNTAIN_BROKEN = 6
+
 ##Not implemented (yet, anyway)
 # CELL_TYPE_PUP_UNKNOWN = 7 # an unopened powerup!
 # CELL_TYPE_PUP_FOG_OF_WAR_LIFTED = 8 # briefly lift fog of war (seed will determine duration - with a chance of it lasting all game)
 # CELL_TYPE_PUP_FAR_SIGHT = 9 # increases the distance the player can see (duration via seed)
 # CELL_TYPE_PUP_GROWTH_MULTIPLIER = 10 # increases or decreases the player's spawn rates across all cell types! duration and multiplier via seed.. perhaps allow multipliers between 0 and 1 to reduce generation.. and even negative to cause troops to shrink! 
 # CELL_TYPE_PUP_POISON = 11 # if ALL player cells lose, eg. 1 troop per 2 turns for 25 turns, it makes sense to use the 'shore up' functionality to reduce number of cells temporarily
+
+
+TERRAIN_TYPE_WATER = 101
+TERRAIN_TYPE_LAND = 102 # TODO
+TERRAIN_TYPE_BEACH = 103 # TODO
+TERRAIN_TYPE_SWAMP = 104 
+TERRAIN_TYPE_MOUNTAIN = 105
+TERRAIN_TYPE_MOUNTAIN_CRACKED = 106
+TERRAIN_TYPE_MOUNTAIN_BROKEN = 107
+
+ENTITY_TYPE_ADMIRAL = 200
+ENTITY_TYPE_SHIP = 201
+ENTITY_TYPE_SHIP_2 = 202 # combine 2 ships to make this. Increased growth rate
+ENTITY_TYPE_SHIP_3 = 203 # combine 1 ship_2 with a ship to make this. Increased growth rate
+ENTITY_TYPE_SHIP_4 = 204 # combine 2 ship_2s or 1 ship_3 and 1 ship to make this. Increased growth rate
+ENTITY_TYPE_INFANTRY = 205
+
+
+
+
+
 
 GAME_STATUS_INIT = -1 # loading
 GAME_STATUS_READY = 1 # able to start
@@ -81,23 +93,38 @@ TIDE_GOING_OUT = 4
 
 # COLOR_TIDE_LOW = '#5c8fe9'
 # COLOR_TIDE_RISING_1 ='#3171e3'
-COLOR_TIDE_LOW = '#3171e3'
+COLOR_TIDE_LOW = '#1A57C4'# '#3171e3'
 COLOR_TIDE_RISING_2 ='#1a59c9'
-COLOR_TIDE_RISING_3 ='#15469e'
+COLOR_TIDE_RISING_3 = '#1850B4' # '#15469e'
 COLOR_TIDE_RISING_4 ='#0f3373'
-COLOR_TIDE_HIGH = '#092048'
+COLOR_TIDE_HIGH = '#0E306C' # '#092048'
 
 COLOR_SWAMP = '#29e29f'
 COLOR_SWAMP_MID_TIDE = '#29d3e3'
+
+COLOR_HIDDEN_BG = '#222222'
+COLOR_HIDDEN_TEXT = '#FFFFFF'
+COLOR_HIDDEN_ICON ='#BBBBBB'
+
+COLOR_MOUNTAINS = '#BBBBBB'
+
 
 # position based on the query that populated self.replay_data
 REPLAY_DATA_COL_TURN = 0 
 REPLAY_DATA_COL_ROW = 1
 REPLAY_DATA_COL_COL = 2
-REPLAY_DATA_COL_TYPE = 3
-REPLAY_DATA_COL_UID = 4
-REPLAY_DATA_COL_TROOPS = 5 
+REPLAY_DATA_COL_CELLTYPE = 3
+REPLAY_DATA_COL_ENTITY_TYPE = 4
+REPLAY_DATA_COL_UID = 5
+REPLAY_DATA_COL_TROOPS = 6
 
-
+# Currently the bot's entire personality, but different behavior checks for the same bot should be built later on
 BOT_BEHAVIOR_PETRI = 1
 BOT_BEHAVIOR_AMBUSH_PREDATOR = 2
+
+# Describes how many often to increment the troops in a cell. eg rate=2 will grow every other turn
+ADMIRAL_GROW_RATE = 2
+SHIP_GROW_RATE = 4
+BLANK_GROW_RATE = 25
+SWAMP_DRAIN_RATE = 1
+BROKEN_MTN_GROW_RATE = 50
