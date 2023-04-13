@@ -6,156 +6,96 @@ from constants import *
 
 class ImageData:
     def __init__(self):
-        self.image_admiral = tk.BitmapImage(data=xbm_admiral) #xbm_admiral_large)
-        self.image_mountain = tk.BitmapImage(data=xbm_mountain)
-        self.image_ship = tk.BitmapImage(data=xbm_ship)
-        self.image_ship_2 = tk.BitmapImage(data=xbm_ship_2)
-        self.image_ship_3 = tk.BitmapImage(data=xbm_ship_3)
-        self.image_ship_4 = tk.BitmapImage(data=xbm_ship_4)
-        self.image_swamp = tk.BitmapImage(data=xbm_swamp)
-        self.image_empty = tk.BitmapImage(data=xbm_empty)
-        self.image_unknown = tk.BitmapImage(data=xbm_unknown)
-        self.image_hex = tk.BitmapImage(data=xbm_hexagon)
-        self.image_circle = tk.BitmapImage(data=xbm_circle)
+       pass
+      
+        # self.image_admiral = tk.BitmapImage(data=xbm_admiral) #xbm_admiral_large)
+        # self.image_mountain = tk.BitmapImage(data=xbm_mountain)
+        # self.image_ship = tk.BitmapImage(data=xbm_ship)
+        # self.image_ship_2 = tk.BitmapImage(data=xbm_ship_2)
+        # self.image_ship_3 = tk.BitmapImage(data=xbm_ship_3)
+        # self.image_ship_4 = tk.BitmapImage(data=xbm_ship_4)
+        # self.image_swamp = tk.BitmapImage(data=xbm_swamp)
+        # self.image_empty = tk.BitmapImage(data=xbm_empty)
+        # self.image_unknown = tk.BitmapImage(data=xbm_unknown)
+        # self.image_hex = tk.BitmapImage(data=xbm_hexagon)
+        # self.image_circle = tk.BitmapImage(data=xbm_circle)
 
-        # self.test_arrows = tk.BitmapImage(
-        #   data=xbm_admiral,
-        #   foreground="black", background="yellow",
-        #   maskdata=xbm_arrow_all
+        # # self.test_arrows = tk.BitmapImage(
+        # #   data=xbm_admiral,
+        # #   foreground="black", background="yellow",
+        # #   maskdata=xbm_arrow_all
+        # # )
+        # # self.test_arrows_invert = tk.BitmapImage(
+        # #   data=xbm_admiral,
+        # #   foreground="black", background="yellow",
+        # #   maskdata=xbm_arrow_all_invert
+        # # )
+        # self.test_arrows_3 = tk.BitmapImage(
+        #   data=xbm_full,
+        #   foreground="black", background="white",
+        #   maskdata=xbm_empty
         # )
-        # self.test_arrows_invert = tk.BitmapImage(
-        #   data=xbm_admiral,
-        #   foreground="black", background="yellow",
-        #   maskdata=xbm_arrow_all_invert
-        # )
-        self.test_arrows_3 = tk.BitmapImage(
-          data=xbm_full,
-          foreground="black", background="white",
-          maskdata=xbm_empty
-        )
 
     # def get_image(self, cell_type=None, entity_type=None, tide=None, owner=None, player_color=None):
     #     print('todo')
 
     # def get_image_icon(cell_type=CELL_TYPE_BLANK, tide=None, is_visible=True, owner_color=None):
-        
 
-    #def get_image_by_cell_type(self, cell_type, tide, owner, owner_color_primary, owner_color_secondary):
-    def get_image_by_cell_type(self, cell_type, icon_color, secondary_color, is_owned, tide, is_visible):
-        
-        
-        if not is_visible:
-          if cell_type in (CELL_TYPE_ADMIRAL, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED, CELL_TYPE_SHIP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_2,CELL_TYPE_SHIP_4):
-            return tk.BitmapImage(data=xbm_unknown, foreground=icon_color)
-          else:
-            return tk.BitmapImage(data=xbm_empty, foreground=icon_color)
-        
+    def get_empty_image(self):
+       return  tk.BitmapImage(data=xbm_empty)
+       
+    def get_image_by_cell(self, cell, icon_color):
+      if cell.is_hidden():
+        if cell.entity_type in (TERRAIN_TYPE_MOUNTAIN, TERRAIN_TYPE_MOUNTAIN_CRACKED) or cell.entity_type in (ENTITY_TYPE_SHIP, ENTITY_TYPE_SHIP_2, ENTITY_TYPE_SHIP_2, ENTITY_TYPE_SHIP_4):
+          return tk.BitmapImage(data=xbm_unknown, foreground=icon_color)
+        else: 
+          return tk.BitmapImage(data=xbm_empty, foreground=icon_color)
+      else: 
 
+        if cell.entity_type == ENTITY_TYPE_ADMIRAL:
+          return tk.BitmapImage(data=xbm_admiral, foreground=icon_color)
 
-        if cell_type == CELL_TYPE_SHIP:
-            #return self.image_ship
-            return tk.BitmapImage(data=xbm_ship, foreground=icon_color)
-         
-        if cell_type == CELL_TYPE_SHIP_2:
+        elif cell.entity_type == ENTITY_TYPE_SHIP:
+          return tk.BitmapImage(data=xbm_ship, foreground=icon_color)
+
+        elif cell.entity_type == ENTITY_TYPE_SHIP_2:
             return tk.BitmapImage(data=xbm_ship_2, foreground=icon_color)
         
-        if cell_type == CELL_TYPE_SHIP_3:
+        elif cell.entity_type == ENTITY_TYPE_SHIP_3:
             return tk.BitmapImage(data=xbm_ship_3, foreground=icon_color)
         
-        if cell_type == CELL_TYPE_SHIP_4:
+        elif cell.entity_type == ENTITY_TYPE_SHIP_4:
             return tk.BitmapImage(data=xbm_ship_4, foreground=icon_color)
     
-        elif cell_type == CELL_TYPE_ADMIRAL: 
-            return tk.BitmapImage(data=xbm_admiral, foreground=icon_color)
-            
-            
-            ####return tk.BitmapImage(data=xbm_admiral, foreground=icon_color, background='green', maskdata=xbm_arrow_all_invert)
-            
-                
-        elif cell_type == CELL_TYPE_MOUNTAIN:
+        elif cell.terrain_type == TERRAIN_TYPE_MOUNTAIN:
           return tk.BitmapImage(data=xbm_mountain, foreground=icon_color)
         
-        elif cell_type == CELL_TYPE_MOUNTAIN_CRACKED:
+        elif cell.terrain_type == TERRAIN_TYPE_MOUNTAIN_CRACKED:
             return tk.BitmapImage(data=xbm_mountain_cracked, foreground=icon_color)
 
-        elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN:
+        elif cell.terrain_type == TERRAIN_TYPE_MOUNTAIN_BROKEN:
             return tk.BitmapImage(data=xbm_mountain_broken, foreground=icon_color)
 
-        elif cell_type == CELL_TYPE_SWAMP:
-            if is_owned:
-              if tide == TIDE_LOW:  
+        elif cell.terrain_type == TERRAIN_TYPE_SWAMP:
+            if cell.entity_type == ENTITY_TYPE_INFANTRY:
+              if self.parent.game.tide.get_tide() == TIDE_LOW:  
                  return tk.BitmapImage(data=xbm_swamp_owned_low_tide, foreground=icon_color)
               else: return tk.BitmapImage(data=xbm_swamp_owned_high_tide, foreground=icon_color)  
-              
             else:
               return tk.BitmapImage(data=xbm_swamp, foreground=icon_color)  
-              return self.image_swamp
         
-        elif cell_type == CELL_TYPE_BLANK:
-            if is_owned:
-              return tk.BitmapImage(data=xbm_circle, foreground=icon_color)   
-              #return self.test_arrows_3
-            
+        elif cell.owner is not None:
+            return tk.BitmapImage(data=xbm_circle, foreground=icon_color)   
               
-            
-              
-            else:
-              return tk.BitmapImage(data=xbm_empty, foreground=icon_color) 
-        
         else:
-            print(f'image not found for cell type {cell_type}!')
-            return tk.BitmapImage(data=xbm_hexagon, foreground=icon_color) 
-# def get_image(img_desc, master, size, fg, bg=None):
-
-#     if img_desc == 'admiral':
-#         img = tk.BitmapImage(data=xbm_admiral)
-
-
-
-
-#     def get_image_by_cell_type(self, cell_type, tide, owner):
-#         if cell_type == CELL_TYPE_SHIP:
-#             return self.image_ship
+          return tk.BitmapImage(data=xbm_empty, foreground=icon_color) 
         
-#         if cell_type == CELL_TYPE_SHIP_2:
-#             return self.image_ship_2
-        
-#         if cell_type == CELL_TYPE_SHIP_3:
-#             return self.image_ship_3
-        
-#         if cell_type == CELL_TYPE_SHIP_4:
-#             return self.image_ship_4
-    
-#         elif cell_type == CELL_TYPE_ADMIRAL: 
-#             return self.image_admiral                       
-                
-#         elif cell_type == CELL_TYPE_MOUNTAIN:
-#             return self.image_mountain
-        
-#         elif cell_type == CELL_TYPE_MOUNTAIN_CRACKED:
-#             return self.image_mountain
+        # else:
+        #     print(f'image not found for cell type {cell_type}!')
+        #     return tk.BitmapImage(data=xbm_hexagon, foreground=icon_color) 
 
-#         elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN:
-#             return self.image_empty
 
-#         elif cell_type == CELL_TYPE_SWAMP:
-#             # if tide == TIDE_HIGH:
-#             #     return self.image_empty
-#             # else:
-#                 return self.image_swamp
-        
-#         elif cell_type == CELL_TYPE_BLANK:
-#             if owner is not None:
-#                 return self.image_circle
-#             return self.image_empty
-        
-#         else:
-#             print(f'image not found for cell type {cell_type}!')
-#             return self.image_hex
-# # def get_image(img_desc, master, size, fg, bg=None):
 
-# #     if img_desc == 'admiral':
-# #         img = tk.BitmapImage(data=xbm_admiral)
 
 
 xbm_full = '''

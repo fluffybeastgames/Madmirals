@@ -8,13 +8,11 @@ from PIL import Image, ImageTk
 ### Project modules
 from constants import *
 from seedy import Seedling # used to determine what the seed demands
-from image_data import * 
 
 class MadmiralsGUI:
     def __init__(self, parent):
         self.root = tk.Tk()
         self.root.title('Madmirals')
-        self.images = ImageData()
         
         self.about_window = None # self.AboutWindow(self)
         self.settings_window = None # except while open
@@ -30,8 +28,9 @@ class MadmiralsGUI:
         
         self.cell_font_size = DEFAULT_FONT_SIZE
         self.label_size = DEFAULT_LABEL_SIZE
-    
-        self.apply_bindings()
+        self.font_buttons = (f'Arial {self.cell_font_size} bold')
+            
+        self.apply_binds()
 
         self.populate_splash_screen()
 
@@ -65,7 +64,7 @@ class MadmiralsGUI:
             # TODO figure out how to get the window to deiconify so we can keep it in memory
             self.about_window = self.AboutWindow(self)
                     
-    def apply_bindings(self):
+    def apply_binds(self):
         # Apply keyboard
         self.root.bind('<Key>', self.key_press_handler)
         self.root.bind('<MouseWheel>', self.zoom_wheel_handler) # Windows OS support
@@ -639,20 +638,13 @@ class MadmiralsGUI:
         
         for i in range(self.parent.game.num_rows):
             for j in range(self.parent.game.num_cols):
-                #self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_game_board, bg='light grey', textvariable=self.parent.game.game_board[(i,j)].display_text, width=8, height=4) # add cell to the dictionary and establish default behavior
                 self.board_cell_buttons[(i, j)] = tk.Button(master=self.frame_buttons, 
-                    #textvariable=self.parent.game.game_board[(i,j)].display_text, 
-                    text='',
-                    width=50, height=50,
-                    image=self.images.image_empty, 
-                    compound=tk.CENTER #,
-                    # highlightthickness=5,
-                    # highlightcolor='red',
-                    # highlightbackground='red'
-                    
-                    ) # add cell to the dictionary and establish default behavior
+                    text='',image=self.parent.images.get_empty_image(), 
+                    width=50, height=50, compound=tk.CENTER 
+                ) # add cell to the dictionary and establish default behavior
                 self.board_cell_buttons[(i, j)].grid(row=i, column=j) # place the cell in the frame
 
+                # Add binds so that button clicks are processed
                 self.board_cell_buttons[(i, j)].bind('<Button-1>', partial(self.btn_left_click, (i,j)))
                 self.board_cell_buttons[(i, j)].bind('<Button-2>', partial(self.btn_middle_click, (i,j)))
                 self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
@@ -783,84 +775,6 @@ class MadmiralsGUI:
         self.frame_win_conditions.grid(row=2, column=9, sticky='news',  pady=(0, 0), padx=(15,15))
     
 
-    def get_cell_deets(self, cell, tide):
-        cell_type = cell.cell_type
-        turn = self.parent.game.turn
-
-        #show_troop_count_if_type = [CELL_TYPE_ADMIRAL, CELL_TYPE_SHIP, CELL_TYPE_SWAMP, CELL_TYPE_SHIP_2, CELL_TYPE_SHIP_3, CELL_TYPE_SHIP_4]
-        
-        is_visible = not (self.parent.fog_of_war and cell.hidden)
-        if not is_visible:
-            icon_color = '#222222'
-            bg_color = '#222222'
-            fg_color = '#DDDDDD'
-            
-        elif cell.owner is not None:
-            icon_color = self.parent.game.players[cell.owner].color_bg
-            fg_color = self.parent.game.players[cell.owner].color_fg 
-            bg_color = '#FFFFFF'
-            #bg_color = None
-
-        else:
-            
-
-            if cell_type in [CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:
-                icon_color = 'dark grey'
-                bg_color = tide_color
-                fg_color = 'white'
-            elif cell_type == CELL_TYPE_MOUNTAIN_BROKEN and tide == COLOR_TIDE_HIGH:
-                icon_color = 'dark grey'
-                bg_color = tide_color
-                fg_color = 'white'
-            elif cell_type == CELL_TYPE_SWAMP and tide == TIDE_HIGH:
-                    icon_color = COLOR_TIDE_HIGH
-                    bg_color = tide_color
-                    fg_color = '#FFFFFF'
-            elif cell_type == CELL_TYPE_SWAMP and tide in (TIDE_COMING_IN, TIDE_GOING_OUT):
-                icon_color = COLOR_SWAMP_MID_TIDE
-                bg_color = tide_color
-                fg_color = '#FFFFFF'                                    
-            elif cell_type == CELL_TYPE_SWAMP:
-                icon_color = COLOR_SWAMP
-                bg_color = tide_color
-                fg_color = 'dark grey'
-            else:
-                
-                icon_color = 'white'
-                bg_color = tide_color
-                fg_color = 'black'
-            
-        if cell.owner is not None:
-            highlightbackground  = None # self.parent.game.players[cell.owner].color_bg
-        else:
-            highlightbackground  = icon_color
-            
-        relief = tk.RAISED if self.parent.game.active_cell == (cell.row, cell.col) else tk.SUNKEN
-        
-        # Shade the neigbors of active cell to draw attention to it
-        if self.parent.game.active_cell in [(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]:
-            bg_color = self.adjust_color_brightness(bg_color, -10)     # maybe instead / in addition change tk.sunken to tk.groove
-            relief = tk.GROOVE
-        
-        # An attempt at making waves -- maybe not worth it just yet.. perhaps use a chance to change image to new value
-        # elif cell_type == CELL_TYPE_BLANK and not cell.hidden and (cell.row**3+cell.col**2+1) % (turn+1) == 0:
-        #     relief = tk.GROOVE
-
-        secondary_color = 'white'
-        # is_visible = not (self.parent.fog_of_war and cell.hidden)
-
-        # cell.img = self.images.get_image_icon(cell.cell_type, tide_color, is_visible=is_visible, owner_color=None, secondary_color=secondary_color)
-
-        cell.img = self.images.get_image_by_cell_type(cell.cell_type, tide, cell.owner, icon_color, secondary_color, tide) # the default icon for this cell
-        
-        if cell.hidden and cell.cell_type_last_seen_by_player is None and self.parent.fog_of_war: # override the default if we can't quite make out what's there
-            if cell_type in [CELL_TYPE_SHIP, CELL_TYPE_MOUNTAIN, CELL_TYPE_MOUNTAIN_CRACKED]:#, CELL_TYPE_MOUNTAIN_BROKEN]:
-                cell.img = self.images.image_unknown
-            else:
-                cell.img = self.images.image_empty
-
-        return bg_color, fg_color, cell.img, text, relief, font, highlightbackground 
-
     def cell_is_in_crosshairs(self, cell, incl_prev_active_cell=True):
         
         near_active_cell = self.parent.game.active_cell in [(cell.row,cell.col) ,(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]
@@ -870,105 +784,25 @@ class MadmiralsGUI:
             return near_active_cell or near_prev_cell
         else:
             return near_active_cell
-        
-    def render_cell(self, cell_address, render_all_cells, tide):
-        cell = self.parent.game.game_board[cell_address]
-        
-        if render_all_cells or cell.changed_this_turn or self.cell_is_in_crosshairs(cell):
-        #if True:
-            font = (f'Arial {self.cell_font_size} bold')
-            text = '' if cell.troops == 0 or (cell.hidden and self.parent.fog_of_war) else cell.troops
-            tide_color = self.parent.game.get_tide_color()[0]
-            is_visible = not (self.parent.fog_of_war and cell.hidden)
-            
-            if cell.cell_type == CELL_TYPE_SWAMP and tide != TIDE_HIGH: # at mid and low tides, we want to distinguish swamps from other territory
-                if tide == TIDE_LOW: bg_color = COLOR_SWAMP
-                elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT): bg_color = COLOR_SWAMP_MID_TIDE
-
-            
-            # Determine exactly which colors to use in this cell, this turn
-            bg_color = tide_color
-
-            if not is_visible:
-                bg_color = '#222222'
-                icon_color = '#BBBBBB'
-                fg_color = '#FFFFFF'
-                is_owned = False
-
-            elif cell.owner is None:
-                
-                icon_color = '#BBBBBB'
-                fg_color = '#FFFFFF'
-                is_owned = False
-
-                
-                if cell.cell_type == CELL_TYPE_SWAMP and tide != TIDE_HIGH: # at mid and low tides, we want to distinguish swamps from other territory
-                    if tide == TIDE_LOW: bg_color = COLOR_SWAMP
-                    elif tide in (TIDE_COMING_IN, TIDE_GOING_OUT): bg_color = COLOR_SWAMP_MID_TIDE
-            
-            else:
-                icon_color = self.parent.game.players[cell.owner].color_bg
-                fg_color = self.parent.game.players[cell.owner].color_fg 
-                is_owned = True
-
-            # Lighten the cell it's the active (currently selected) cell to bring attention to it
-            # Also darken the cell if it's adjacent to the active cell
-            if self.parent.game.active_cell == cell_address:
-                bg_color = self.adjust_color_brightness(bg_color, +50)     # maybe instead / in addition change tk.sunken to tk.groove
-            elif self.parent.game.active_cell in [(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]:
-                bg_color = self.adjust_color_brightness(bg_color, -50)     # maybe instead / in addition change tk.sunken to tk.groove
-                # relief = tk.GROOVE
-        
-
-                
-#            img = cell.img
-
-            secondary_color='#FFFFFF' 
-            cell.img = self.images.get_image_by_cell_type(cell.cell_type, icon_color, secondary_color, is_owned, tide, is_visible) # the default icon for this cell
-
-            self.board_cell_buttons[cell_address].config(
-                font=font, text=text, bg=bg_color, fg=fg_color, image=cell.img, 
-                width=self.label_size, height=self.label_size,         
-            )
 
 
-            # bg_color # tide color unless
-            # fg_color # white or black or grey, depending 
-            # img # depends on cell type, tide, fog of war, and player color
-
-            # set display text, color, and image
-            # bg_color, fg_color, img, text, relief, font, highlightbackground  = self.get_cell_deets(cell, tide)
-            
-            # #self.board_cell_buttons[(i, j)].config(bg=bg_color, fg=fg_color, relief=relief, image=img, font=font, text=text, width=self.label_size, height=self.label_size, highlightbackground=highlightbackground )
-            # self.board_cell_buttons[cell_address].config(
-            #     bg=bg_color, fg=fg_color, relief=relief, image=img, 
-            #     font=font, text=text, width=self.label_size, height=self.label_size, 
-                    
-            # )
-            return True # tell the calling function that we did render this cell this turn
-        else:
-            return False
         
     def render(self):  
-        tide = self.parent.game.get_tide()
-        new_tide = self.parent.game.tide_just_changed_to()
-        
-        render_all_cells = self.parent.game_settings_changed_this_turn or new_tide is not None
+        tide, desc, color, swamp_color, tide_change = self.parent.game.tide.get_tide_info()
+                
+        render_all_cells = self.parent.game_settings_changed_this_turn or tide_change
         
         #list_rendered_this_turn = []
         if self.parent.game is not None:          
             for i in range(self.parent.game.num_rows):
                 for j in range(self.parent.game.num_cols):
-                    cell_added = self.render_cell((i,j),render_all_cells, tide)
+                    cell_added = self.render_cell((i,j), render_all_cells, tide)
                      
                     #if cell_added: list_rendered_this_turn.append((i, j))
 
             #print(f'Rendered: {len(list_rendered_this_turn)}')
             self.update_score_board()
             self.update_tide_chart()
-            
-            if render_all_cells:
-                self.update_game_board_frame_bg()          
 
         self.root.update_idletasks()
 
@@ -977,6 +811,24 @@ class MadmiralsGUI:
         #     self.debug_label_text.set(self.get_performance_stats())
         # else:
         #     self.debug_label_text.set('')
+        
+    def render_cell(self, cell_address, render_all_cells, tide):
+        cell = self.parent.game.game_board[cell_address]
+        
+        if render_all_cells or cell.changed_this_turn or self.cell_is_in_crosshairs(cell):
+            text, bg, fg, image = cell.get_button_info()
+            
+            self.board_cell_buttons[cell_address].config(
+                text=text, bg=bg, fg=fg, image=image, 
+                font=self.font_buttons, width=self.label_size, height=self.label_size,         
+            )
+
+            return True # tell the calling function that we did render this cell this turn
+        else:
+            return False
+
+    def update_game_board_frame_bg(self):
+        self.frame_game_board.config(bg=self.parent.game.tide.get_tide_color()[0])
 
     def update_score_board(self):
         dict_names = {}
@@ -1019,7 +871,7 @@ class MadmiralsGUI:
 
 
     def update_tide_chart(self):
-        tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color = self.parent.game.get_tide_frame_info()
+        tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color = self.parent.game.tide.get_tide_frame_info()
         self.frame_tide_chart.lbl_current_tide.config(text=tide)
         self.frame_tide_chart.lbl_next_tide.config(text=next_tide)
         self.frame_tide_chart.lbl_next_tide_time.config(text=next_tide_time)
@@ -1028,8 +880,6 @@ class MadmiralsGUI:
         self.frame_tide_chart.config(bg=bg_color)
         
 
-    def update_game_board_frame_bg(self):
-        self.frame_game_board.config(bg=self.parent.game.get_tide_color()[0])
         
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
         print('game over, man')

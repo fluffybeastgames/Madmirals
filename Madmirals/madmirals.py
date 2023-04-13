@@ -8,6 +8,8 @@ from gam_inst import MadmiralsGameInstance
 from gui import MadmiralsGUI
 from db import MadDBConnection
 import setup # todo - use in app.. for when no DB detected but also for adding new user profiles
+from image_data import * 
+
 
 class MadmiralsGameManager:
     GAME_TURN_SPEED = .5 # in s
@@ -17,7 +19,7 @@ class MadmiralsGameManager:
         self.db = MadDBConnection('..\data\mad_dev_test.db')
         # self.con = sqlite3.connect()
         # self.cur = self.con.cursor()
-
+        self.images = ImageData()
         self.gui = MadmiralsGUI(self)
         self.game = MadmiralsGameInstance(self)
         #self.game = None
@@ -30,6 +32,7 @@ class MadmiralsGameManager:
         # self.game.game_status = GAME_STATUS_READY
 
         self.game_loop() # start the game cycle!
+
     
 
     def create_new_replay_game(self, game_id):
