@@ -36,12 +36,12 @@ ENTITY_TYPE_INFANTRY = 205
 
 
 
-GAME_STATUS_INIT = -1 # loading
-GAME_STATUS_READY = 1 # able to start
-GAME_STATUS_IN_PROGRESS = 2 #
-GAME_STATUS_PAUSE = 3 #
-GAME_STATUS_GAME_OVER_WIN = 4 # game instance is complete and can no longer be played
-GAME_STATUS_GAME_OVER_LOSE = 5 # game instance is complete and can no longer be played
+GAME_STATUS_INIT = 'Init' # loading
+GAME_STATUS_READY = 'Ready' # able to start
+GAME_STATUS_IN_PROGRESS = 'In Progress' #
+GAME_STATUS_PAUSE = 'Paused' #
+GAME_STATUS_GAME_OVER_WIN = 'Won' # game instance is complete and can no longer be played
+GAME_STATUS_GAME_OVER_LOSE = 'Lost' # game instance is complete and can no longer be played
 
 GAME_MODE_FFA = 1
 GAME_MODE_FFA_CUST = 2
@@ -56,6 +56,25 @@ ACTION_CHARGE = 777 # idea: start a chain of move_normals that extends to the ed
     
 ACTION_QUEUE_MAX_SIZE = 100 # do not accept new queued moves if the player has this many pending
 
+
+# Currently the bot's entire personality, but different behavior checks for the same bot should be built later on
+# TODO rename these to be more logically consistent - eg BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL is a set of actions to perform while acting out a different 'behavior'
+BOT_BEHAVIOR_PETRI = 1 # Analyzes current board state and comes up with a weighted list of suggested moves; a weighted sort picks one. Chaotic and shortsighted, but not totally stupid.
+BOT_BEHAVIOR_TRACKER = 2 # Picks a ship or admiral on the board and queues up an A*-generated list of move towards the target. Initial version may also default to petri-ing
+BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL = 11 # Currently used by the tracker behavior to queue up different actions in one go
+BOT_BEHAVIOR_MOVE_HALF_THEN_ALL = 12 # Currently used by the tracker behavior to queue up different actions in one go
+BOT_BEHAVIOR_MOVE_ALL = 13 # Currently used by the tracker behavior to queue up the same action each time, used alongside the "move half then ..." actions
+BOT_BEHAVIOR_GROW_ONLY = 14 # Programmed to grow into empty spaces when possible, resorting to combat and other operations when needed. Waits if it can't find a valid move
+BOT_BEHAVIOR_AMBUSH_ONLY = 15 # Waits until it is touched by an enemy.. as soon as one of its entities has enough troops to overwhelm the troops along the A* to the nearest touching entity, queue it up to move like the tracker
+BOT_BEHAVIOR_GATHER = 16 # pick an owned, non-entity cell with more than one cell (maybe weighted towards the one with the most troops?) and set in an ACTION_MOVE_NORMAL A* course to the nearest admiral
+
+BOT_PERSONALITY_PETRI = 101 # all petri all the time
+BOT_BEHAVIOR_TRACKER = 102 # always on the hunt
+BOT_BEHAVIOR_GROW_ONLY = 103 # james and the giant reach
+BOT_BEHAVIOR_AMBUSH_ONLY = 104 # crouching bot, hidden bot
+BOT_BEHAVIOR_PETRI_AND_GATHER = 105 # like herding cats
+
+
 ### GUI
 MIN_FONT_SIZE = 6
 MAX_FONT_SIZE = 32
@@ -63,9 +82,11 @@ DEFAULT_FONT_SIZE = 10
 
 MIN_LABEL_SIZE = 25
 MAX_LABEL_SIZE = 250
-DEFAULT_LABEL_SIZE = 60
+DEFAULT_LABEL_SIZE = 55
 
-ROW_FRAME_WIN_CONDS = 2
+MAGIC_NUM_TO_FIX_CELL_SIZE = 0 # tk.Button seems to add 5 px to the height and width 
+
+ROW_FRAME_WIN_CONDS = 2 #????
 
 ### Game Settings window / Seedy
 MIN_BOTS = 1
@@ -93,14 +114,14 @@ TIDE_GOING_OUT = 4
 
 # COLOR_TIDE_LOW = '#5c8fe9'
 # COLOR_TIDE_RISING_1 ='#3171e3'
-COLOR_TIDE_LOW = '#1A57C4'# '#3171e3'
+COLOR_TIDE_LOW = '#1A57C4' # old:'#3171e3'
 COLOR_TIDE_RISING_2 ='#1a59c9'
-COLOR_TIDE_RISING_3 = '#1850B4' # '#15469e'
+COLOR_TIDE_RISING_3 = '#1850B4' # old: '#15469e'
 COLOR_TIDE_RISING_4 ='#0f3373'
-COLOR_TIDE_HIGH = '#0E306C' # '#092048'
+COLOR_TIDE_HIGH = '#0E306C' # old: '#092048'
 
-COLOR_SWAMP = '#29e29f'
-COLOR_SWAMP_MID_TIDE = '#29d3e3'
+COLOR_SWAMP = '#0E735A' # old: '#29e29f'
+COLOR_SWAMP_MID_TIDE = '#105F72' # old: '#29d3e3'
 
 COLOR_HIDDEN_BG = '#222222'
 COLOR_HIDDEN_TEXT = '#FFFFFF'
@@ -118,13 +139,10 @@ REPLAY_DATA_COL_ENTITY_TYPE = 4
 REPLAY_DATA_COL_UID = 5
 REPLAY_DATA_COL_TROOPS = 6
 
-# Currently the bot's entire personality, but different behavior checks for the same bot should be built later on
-BOT_BEHAVIOR_PETRI = 1
-BOT_BEHAVIOR_AMBUSH_PREDATOR = 2
 
 # Describes how many often to increment the troops in a cell. eg rate=2 will grow every other turn
 ADMIRAL_GROW_RATE = 2
-SHIP_GROW_RATE = 4
+SHIP_GROW_RATE = 6
 BLANK_GROW_RATE = 25
 SWAMP_DRAIN_RATE = 1
 BROKEN_MTN_GROW_RATE = 50

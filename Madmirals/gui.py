@@ -4,6 +4,7 @@ from tkinter import ttk
 from tkinter import colorchooser
 from functools import partial
 from PIL import Image, ImageTk
+import time
 
 ### Project modules
 from constants import *
@@ -13,19 +14,22 @@ class MadmiralsGUI:
     def __init__(self, parent):
         self.root = tk.Tk()
         self.root.title('Madmirals')
-        
+
         self.about_window = None # self.AboutWindow(self)
         self.settings_window = None # except while open
 
         self.root.config(menu=self.create_menu_bar(self.root))
         self.parent = parent
         
-        self.frame_game_board = tk.Frame(master=self.root)
-        self.frame_scoreboard = tk.Frame(master=self.root)
-        self.frame_tide_chart = tk.Frame(master=self.root)        
-        self.frame_win_conditions = tk.Frame(master=self.root)
-        self.frame_splash_screen = tk.Frame(master=self.root)
+        self.frame_splash_screen = tk.Frame(master=self.root) # Shows at app startup, with buttons for New Game and How to Play
         
+        self.frame_game_board = tk.Frame(master=self.root) # contains the cell buttons that make up the game
+        self.frame_scoreboard = tk.Frame(master=self.root) # List of players sorted by score, descending. Includes header labels, including current turn no
+        self.frame_tide_chart = tk.Frame(master=self.root) # Current and upcoming tides and timers        
+        self.frame_win_conditions = tk.Frame(master=self.root) # Explains the current game mode
+        self.frame_debug = tk.Frame(master=self.root) # When enabled, displays performance stats such as FPS
+        self.frame_chat_log = tk.Frame(master=self.root) # A log of game events.. primarily 
+
         self.cell_font_size = DEFAULT_FONT_SIZE
         self.label_size = DEFAULT_LABEL_SIZE
         self.font_buttons = (f'Arial {self.cell_font_size} bold')
@@ -53,6 +57,15 @@ class MadmiralsGUI:
 
         def hide(self):
             self.window.withdraw()
+         
+
+    def prep_new_game(self):
+        self.populate_game_board_frame()
+        self.populate_scoreboard_frame()
+        self.populate_tide_frame()
+        self.populate_win_conditions_frame()
+        self.populate_debug_frame()
+
 
     def open_about_window(self):
         #self.about_window = self.AboutWindow(self)
@@ -81,7 +94,6 @@ class MadmiralsGUI:
         self.root.bind('<Control-D>', self.toggle_debug_mode)
         self.root.bind('<Control-O>', self.open_replay_window)
         self.root.bind('<Control-o>', self.open_replay_window)
-        
         
         
     def zoom_wheel_handler(self, event):
@@ -118,7 +130,6 @@ class MadmiralsGUI:
         self.parent.create_new_game(num_rows=num_rows, num_cols=num_cols, num_players=num_players, seed=seed, game_mode=game_mode, player_color=player_color, 
             player_name=player_name)            
 
-        print('withdraw')
         self.frame_splash_screen.grid_remove()
 
     def btn_left_click(self, address, event):
@@ -585,10 +596,6 @@ class MadmiralsGUI:
             self.top.destroy()
             # self.top = None
                     
-    # class SplashScreen:
-    #     def __init__(self):
-    #         self.splash_frame = tk.Frame()
-    #         self.splash_frame.labelTitle = tk.Label(self.splash_Frame)
 
     def populate_splash_screen(self):
         # def open_game_from_splash(self):
@@ -664,8 +671,6 @@ class MadmiralsGUI:
         self.lbl_turn_count = tk.Label(master=self.frame_scoreboard, text='Turn 0', font=('Arial 18 bold'))
         self.lbl_turn_count.grid(row = 1, column = 0)
 
-
-
         self.bg_frames = []
 
         self.lbls_name = []
@@ -674,28 +679,14 @@ class MadmiralsGUI:
         self.lbls_ships = []
         self.lbls_troops = []
         
-
         name_label_width = SCORE_BOARD_WIDTH_NAME_MIN
         for i in range(self.parent.game.num_players):
             if len(self.parent.game.players[i].user_desc) > name_label_width:
                 name_label_width = min(len(self.parent.game.players[i].user_desc), SCORE_BOARD_WIDTH_NAME_MAX)
-        # print(f'Decided on a scoreboard width of {name_label_width}')
-        
-
-
         
         self.frame_score_header = tk.Frame(master=self.frame_scoreboard)
-        # tk.Label(master=self.frame_score_header, text=f'player', width=name_label_width, font=('Arial 16 bold'), anchor='w').grid(row=1, column=1, sticky='w')
-        # self.lblheader_cells = tk.Label(master=self.frame_score_header, text=f'Size', width=SCORE_BOARD_WIDTH_LAND, font=('Arial 16 bold'), anchor='e'))
-        # self.lblheader_admirals = tk.Label(master=self.frame_score_header, text=f'Admirals {i}', width=SCORE_BOARD_WIDTH_ADMIRALS, font=('Arial 16 bold'), anchor='e'))
-        # self.lblheader_ships = tk.Label(master=self.frame_score_header, text=f'Ships {i}', width=SCORE_BOARD_WIDTH_SHIPS, font=('Arial 16 bold'), anchor='e'))                        
-        # self.lblheader_troops = tk.Label(master=self.frame_score_header, text=f'Troops {i}', width=SCORE_BOARD_WIDTH_TROOPS, font=('Arial 16 bold'), anchor='e'))
-
-        # .grid(row=i + ROW_OFFSET, column=0, sticky='w')
-
 
         self.frame_score_header = tk.Frame(master=self.frame_scoreboard)
-        #self.lblheader_name = tk.Label(master=self.frame_score_header, text=f'player', width=name_label_width, font=('Arial 16 bold'), anchor='w')
         tk.Label(master=self.frame_score_header, text=f'Player', width=name_label_width, font=('Arial 16 bold'), anchor='w').grid(row=0, column=0)
         tk.Label(master=self.frame_score_header, text=f'Cells', width=SCORE_BOARD_WIDTH_LAND, font=('Arial 16 bold'), anchor='e').grid(row=0, column=1)
         tk.Label(master=self.frame_score_header, text=f'Adm', width=SCORE_BOARD_WIDTH_ADMIRALS, font=('Arial 16 bold'), anchor='e').grid(row=0, column=2)
@@ -741,20 +732,46 @@ class MadmiralsGUI:
         self.frame_tide_chart.lbl_current_tide      = tk.Label(master=self.frame_tide_chart, text='Low Tide', font=('Arial 18 bold'))
         self.frame_tide_chart.lbl_upcoming_tides    = tk.Label(master=self.frame_tide_chart, text='Upcoming Tides', font=('Arial 18 bold'))
         self.frame_tide_chart.lbl_next_tide         = tk.Label(master=self.frame_tide_chart, text='High', font=('Arial 18'))
-        self.frame_tide_chart.lbl_next_tide_time      = tk.Label(master=self.frame_tide_chart, text='23', font=('Arial 18'))
+        self.frame_tide_chart.lbl_next_tide_time    = tk.Label(master=self.frame_tide_chart, text='23', font=('Arial 18'))
         self.frame_tide_chart.lbl_later_tide        = tk.Label(master=self.frame_tide_chart, text='tide', font=('Arial 18'))
-        self.frame_tide_chart.lbl_later_tide_time     = tk.Label(master=self.frame_tide_chart, text='123', font=('Arial 18'))
+        self.frame_tide_chart.lbl_later_tide_time   = tk.Label(master=self.frame_tide_chart, text='123', font=('Arial 18'))
         
-        self.frame_tide_chart.lbl_header.grid         (row=0, column=0, sticky='NW')
-        self.frame_tide_chart.lbl_current_tide.grid   (row=0, column=1, sticky='NW')
-        self.frame_tide_chart.lbl_upcoming_tides.grid (row=1, column=0, sticky='NE')
-        self.frame_tide_chart.lbl_next_tide.grid      (row=2, column=0, sticky='NW')
-        self.frame_tide_chart.lbl_next_tide_time.grid   (row=2, column=1, sticky='NE')
-        self.frame_tide_chart.lbl_later_tide.grid     (row=3, column=0, sticky='NW')
-        self.frame_tide_chart.lbl_later_tide_time.grid  (row=3, column=1, sticky='NE')
+        self.frame_tide_chart.lbl_header.grid         (row=0, column=0, sticky='NEWS')
+        self.frame_tide_chart.lbl_current_tide.grid   (row=0, column=1, sticky='NEWS')
+        self.frame_tide_chart.lbl_upcoming_tides.grid (row=1, column=0, columnspan=2, sticky='NEWS')
+        self.frame_tide_chart.lbl_next_tide.grid      (row=2, column=0, sticky='NEWS')
+        self.frame_tide_chart.lbl_next_tide_time.grid   (row=2, column=1, sticky='NEWS')
+        self.frame_tide_chart.lbl_later_tide.grid     (row=3, column=0, sticky='NEWS')
+        self.frame_tide_chart.lbl_later_tide_time.grid  (row=3, column=1, sticky='NEWS')
 
+        self.frame_tide_chart.grid(row=1, column=9, sticky='NEWS',  pady=(0, 0), padx=(15,15))
 
-        self.frame_tide_chart.grid(row=1, column=9, sticky='news',  pady=(0, 0), padx=(15,15))
+    def populate_debug_frame(self):
+        if not self.frame_debug is None:
+            self.frame_debug.destroy()
+
+        self.frame_debug = tk.Frame(master=self.root, highlightbackground='black', highlightthickness=3)
+        
+        tk.Label(master=self.frame_debug, text='Debug', font=('Arial 22 bold')).grid(row=0, column=0, sticky='W', padx=10)
+        tk.Label(master=self.frame_debug, text='Frames', font=('Arial 12')).grid(row=1, column=0, sticky='E', padx=10)
+        tk.Label(master=self.frame_debug, text='Time (s)', font=('Arial 12')).grid(row=1, column=1, sticky='E', padx=10)
+        tk.Label(master=self.frame_debug, text='FPS', font=('Arial 12')).grid(row=1, column=2, sticky='E', padx=10)
+        tk.Label(master=self.frame_debug, text='Game Status', font=('Arial 12')).grid(row=1, column=3, sticky='W', padx=10)
+        tk.Label(master=self.frame_debug, text='Seed', font=('Arial 12')).grid(row=1, column=4, sticky='W', padx=10)
+    
+        self.frame_debug.lbl_frames = tk.Label(master=self.frame_debug, text=999, font=('Arial 12 bold'))
+        self.frame_debug.lbl_time = tk.Label(master=self.frame_debug, text=999, font=('Arial 12 bold'))
+        self.frame_debug.lbl_fps = tk.Label(master=self.frame_debug, text=999, font=('Arial 12 bold'))
+        self.frame_debug.lbl_game_status = tk.Label(master=self.frame_debug, text=GAME_STATUS_INIT, font=('Arial 12 bold'))
+        self.frame_debug.lbl_seed = tk.Label(master=self.frame_debug, text='0123456789', font=('Arial 12 bold'))
+
+        self.frame_debug.lbl_frames.grid(row=2, column=0, sticky='E', padx=10)
+        self.frame_debug.lbl_time.grid(row=2, column=1, sticky='E', padx=10)
+        self.frame_debug.lbl_fps.grid(row=2, column=2, sticky='E', padx=10)
+        self.frame_debug.lbl_game_status.grid(row=2, column=3, sticky='W', padx=10)
+        self.frame_debug.lbl_seed.grid(row=2, column=4, sticky='W', padx=10)
+        
+        self.frame_debug.grid(row=3, column=9, sticky='NEWS',  pady=(0, 0), padx=(15,15))
 
     def populate_win_conditions_frame(self):
         if not self.frame_win_conditions is None:
@@ -777,20 +794,29 @@ class MadmiralsGUI:
 
     def cell_is_in_crosshairs(self, cell, incl_prev_active_cell=True):
         
-        near_active_cell = self.parent.game.active_cell in [(cell.row,cell.col) ,(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]
-        
+        near_active_cell = self.parent.game.active_cell in [
+            (cell.row,cell.col), (cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1),
+            (cell.row-1,cell.col-1), (cell.row-1,cell.col+1), (cell.row+1,cell.col-1), (cell.row+1,cell.col+1)
+            ]
+
         if incl_prev_active_cell:
-            near_prev_cell = self.parent.game.active_cell_prev in [(cell.row,cell.col) ,(cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1)]
+            near_prev_cell = self.parent.game.active_cell_prev in [
+            (cell.row,cell.col), (cell.row-1,cell.col), (cell.row+1,cell.col), (cell.row,cell.col-1), (cell.row,cell.col+1),
+            (cell.row-1,cell.col-1), (cell.row-1,cell.col+1), (cell.row+1,cell.col-1), (cell.row+1,cell.col+1)
+            ]
             return near_active_cell or near_prev_cell
         else:
             return near_active_cell
 
 
+
         
     def render(self):  
+        self.parent.game.frames_rendered += 1
+        
         tide, desc, color, swamp_color, tide_change = self.parent.game.tide.get_tide_info()
                 
-        render_all_cells = self.parent.game_settings_changed_this_turn or tide_change
+        render_all_cells = self.parent.game_settings_changed_this_turn or tide_change or self.parent.game.turn % 10 == 0
         
         #list_rendered_this_turn = []
         if self.parent.game is not None:          
@@ -803,24 +829,22 @@ class MadmiralsGUI:
             #print(f'Rendered: {len(list_rendered_this_turn)}')
             self.update_score_board()
             self.update_tide_chart()
+            self.update_debug_frame()
+            self.update_chat_log_frame()
+            
 
         self.root.update_idletasks()
 
-        # print('todo - if debug mode, show extra frame and update text, otherwise keep it hidden')
-        #             if self.parent.debug_mode: 
-        #     self.debug_label_text.set(self.get_performance_stats())
-        # else:
-        #     self.debug_label_text.set('')
         
     def render_cell(self, cell_address, render_all_cells, tide):
         cell = self.parent.game.game_board[cell_address]
         
-        if render_all_cells or cell.changed_this_turn or self.cell_is_in_crosshairs(cell):
+        if render_all_cells or cell.changed_this_turn or self.cell_is_in_crosshairs(cell): # or self.cell_was_in_crosshairs(cell):
             text, bg, fg, image = cell.get_button_info()
             
             self.board_cell_buttons[cell_address].config(
                 text=text, bg=bg, fg=fg, image=image, 
-                font=self.font_buttons, width=self.label_size, height=self.label_size,         
+                font=self.font_buttons, width=self.label_size + MAGIC_NUM_TO_FIX_CELL_SIZE, height=self.label_size + MAGIC_NUM_TO_FIX_CELL_SIZE         
             )
 
             return True # tell the calling function that we did render this cell this turn
@@ -871,18 +895,42 @@ class MadmiralsGUI:
 
 
     def update_tide_chart(self):
-        tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color = self.parent.game.tide.get_tide_frame_info()
+        tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color, bg_next, bg_later = self.parent.game.tide.get_tide_frame_info() # TODO add colors to tide chart
+        #tide, next_tide, next_tide_time, later_tide, later_tide_time, bg_color = self.parent.game.tide.get_tide_frame_info()
         self.frame_tide_chart.lbl_current_tide.config(text=tide)
-        self.frame_tide_chart.lbl_next_tide.config(text=next_tide)
-        self.frame_tide_chart.lbl_next_tide_time.config(text=next_tide_time)
-        self.frame_tide_chart.lbl_later_tide.config(text=later_tide)
-        self.frame_tide_chart.lbl_later_tide_time.config(text=later_tide_time)
+        self.frame_tide_chart.lbl_next_tide.config(text=next_tide, bg=bg_next)
+        self.frame_tide_chart.lbl_next_tide_time.config(text=next_tide_time, bg=bg_next)
+        self.frame_tide_chart.lbl_later_tide.config(text=later_tide, bg=bg_later)
+        self.frame_tide_chart.lbl_later_tide_time.config(text=later_tide_time, bg=bg_later)
         self.frame_tide_chart.config(bg=bg_color)
+    
+    # def get_game_status_string(self, status):
+    #     if status == GAME_STATUS_INIT
         
+    def update_debug_frame(self):
+        # print('update_debug_frame')
+
+        frames = self.parent.game.frames_rendered
+        elapsed = round(time.time() - self.parent.game.game_creation_time, 1)
+        fps = round(frames/elapsed, 1)
+
+        self.frame_debug.lbl_frames.config(text=frames)
+        self.frame_debug.lbl_time.config(text=elapsed)        
+        self.frame_debug.lbl_fps.config(text=fps)
+        self.frame_debug.lbl_game_status.config(text=self.parent.game.game_status)
+        self.frame_debug.lbl_seed.config(text=self.parent.game.seed)
 
         
+    def update_chat_log_frame(self):
+        pass
+        # print('update_chat_log_frame')
+        
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
-        print('game over, man')
+        # print('game over, man')
+        self.parent.fog_of_war = False
+        self.parent.game_settings_changed_this_turn = True
+        self.render()
+        # self.populate_frame_victory("You Win and/or Lose!")
         pass
     
        

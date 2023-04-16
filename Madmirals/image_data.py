@@ -46,7 +46,7 @@ class ImageData:
        
     def get_image_by_cell(self, cell, icon_color):
       if cell.is_hidden():
-        if cell.entity_type in (TERRAIN_TYPE_MOUNTAIN, TERRAIN_TYPE_MOUNTAIN_CRACKED) or cell.entity_type in (ENTITY_TYPE_SHIP, ENTITY_TYPE_SHIP_2, ENTITY_TYPE_SHIP_2, ENTITY_TYPE_SHIP_4):
+        if cell.terrain_type in (TERRAIN_TYPE_MOUNTAIN, TERRAIN_TYPE_MOUNTAIN_CRACKED) or cell.entity_type in (ENTITY_TYPE_SHIP, ENTITY_TYPE_SHIP_2, ENTITY_TYPE_SHIP_2, ENTITY_TYPE_SHIP_4):
           return tk.BitmapImage(data=xbm_unknown, foreground=icon_color)
         else: 
           return tk.BitmapImage(data=xbm_empty, foreground=icon_color)

@@ -13,7 +13,7 @@ from image_data import *
 
 class MadmiralsGameManager:
     GAME_TURN_SPEED = .5 # in s
-    CYCLE_SPEED = 100 # ms between checks of game loop
+    CYCLE_SPEED = 20 # ms between checks of game loop
 
     def __init__(self):
         self.db = MadDBConnection('..\data\mad_dev_test.db')
@@ -56,23 +56,21 @@ class MadmiralsGameManager:
         self.game.game_status = GAME_STATUS_IN_PROGRESS
     
         self.game_loop() # start the game cycle!
-         
 
-    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None, player_name=None):
+
+    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None, player_name=None, fog=True):
         print('create_new_game')
 
-        self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players, player_color=player_color, player_name=player_name)
+        self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players, player_color=player_color, player_name=player_name, fog=fog)
         
-        self.gui.populate_game_board_frame()
-        self.gui.populate_scoreboard_frame()
-        self.gui.populate_tide_frame()
-        self.gui.populate_win_conditions_frame()
+        self.gui.prep_new_game()
         
         self.last_turn_timestamp = time.time()
         self.after_id = None # for repeating the game loop
 
         self.game.game_status = GAME_STATUS_IN_PROGRESS
         self.game_settings_changed_this_turn = True 
+        self.gui.render()
 
         self.game_loop() # start the game cycle!
 
@@ -99,10 +97,9 @@ class MadmiralsGameManager:
                 self.game_settings_changed_this_turn = False # eg zoom, end of game, change of tide.. if so, we will render everything
 
             elif self.game.game_status == GAME_STATUS_PAUSE:
-                #print('paused')
+                self.gui.render()
                 pass
-            elif self.game.game_status in (GAME_STATUS_GAME_OVER_LOSE, GAME_STATUS_GAME_OVER_LOSE):
-                print('here')
+            elif self.game.game_status in (GAME_STATUS_GAME_OVER_WIN, GAME_STATUS_GAME_OVER_LOSE):
                 self.gui.render_game_over()
             else:
                 pass
