@@ -66,17 +66,18 @@ class MadmiralsGameInstance:
             self.add_game_to_log()
             self.record_starting_conditions()
             
-    def closest_instance_of_entity(self, entity_type, ref_address):
+    def closest_instance_of_entity(self, entity_type, ref_address, entity_owner=None):
         closest_entity_address = None
         closest_entity_distance = 999
 
         for r in range(self.num_rows):
             for c in range(self.num_cols):
                 if (r, c) != ref_address and self.game_board[(r, c)].entity_type == entity_type:
-                    distance = abs(ref_address[0] - r) + abs(ref_address[1] - c)
-                    if distance < closest_entity_distance:
-                        closest_entity_distance = distance
-                        closest_entity_address = (r, c)
+                    if entity_owner is None or self.game_board[(r, c)].owner == entity_owner: 
+                        distance = abs(ref_address[0] - r) + abs(ref_address[1] - c)
+                        if distance < closest_entity_distance:
+                            closest_entity_distance = distance
+                            closest_entity_address = (r, c)
 
         return closest_entity_address, closest_entity_distance # will return None if no entities found on map
 
@@ -212,29 +213,24 @@ class MadmiralsGameInstance:
                 if self.player_name is not None:
                     user_desc = self.player_name
                   
-            bot_behavior = None
-            if i > 0:    
-                # if i % 6 == 0:
-                #      bot_behavior = BOT_BEHAVIOR_TRACKER
-                # elif i % 6 == 1:
-                #     bot_behavior = BOT_BEHAVIOR_AMBUSH_ONLY
-                # elif i % 6 == 2:
-                #     bot_behavior = BOT_BEHAVIOR_GROW_ONLY
-
+            bot_personality = None
+            if i > 0:   
                 if i == 2:
-                     bot_behavior = BOT_BEHAVIOR_TRACKER
+                    bot_personality = BOT_PERSONALITY_TRACKER
                 elif i == 3:
-                    bot_behavior = BOT_BEHAVIOR_AMBUSH_ONLY
+                    bot_personality = BOT_PERSONALITY_AMBUSH_ONLY
                 elif i == 4:
-                    bot_behavior = BOT_BEHAVIOR_GROW_ONLY
+                    bot_personality = BOT_PERSONALITY_GROW_ONLY
+                elif i == 5:
+                    bot_personality = BOT_PERSONALITY_PETRI_AND_GATHER
+                elif i == 6:
+                    bot_personality = BOT_PERSONALITY_GROW_PETRI_AND_GATHER
                 elif i == 1:
-                    bot_behavior = BOT_BEHAVIOR_GATHER
-                                        
-                                        
+                    bot_personality = BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK                                        
                 else:
-                    bot_behavior = BOT_BEHAVIOR_PETRI #BOT_BEHAVIOR_PETRI
+                    bot_personality = BOT_PERSONALITY_PETRI #BOT_BEHAVIOR_PETRI
 
-            self.players[i] = self.GamePlayer(self, player_id, user_desc, bg, fg, bot_behavior)
+            self.players[i] = self.GamePlayer(self, player_id, user_desc, bg, fg, bot_personality)
             
             # every player moves at the same time, but turn order determines the order of operations.
             # This would be quite unfair if this were a multiplayer game. Instead, it would give player 0 (aka user) an advantage
@@ -328,8 +324,7 @@ class MadmiralsGameInstance:
             else:
                 target_cell = least_item_cell
             
-            print(f'Nearest admiral, distance: {self.closest_instance_of_entity(ENTITY_TYPE_ADMIRAL, (target_cell.row, target_cell.col))}')
-            print('TODO do not allow admirals to spawn close together')
+            print(f'Nearest admiral, distance: {self.closest_instance_of_entity(ENTITY_TYPE_ADMIRAL, (target_cell.row, target_cell.col))}\tTODO do not allow admirals to spawn close together')
             target_cell.owner = self.players[p].user_id
             target_cell.entity_type = ENTITY_TYPE_ADMIRAL
             target_cell.terrain_type = TERRAIN_TYPE_WATER
@@ -628,19 +623,55 @@ class MadmiralsGameInstance:
         else:
             self.game_status == GAME_STATUS_GAME_OVER_LOSE
 
+
+    def get_bot_behavior(self, bot_num):
+        pers = self.players[bot_num].bot_personality  
+
+        if pers == BOT_PERSONALITY_AMBUSH_ONLY: return BOT_BEHAVIOR_AMBUSH
+        elif pers == BOT_PERSONALITY_GROW_ONLY: return BOT_BEHAVIOR_GROW
+        elif pers == BOT_PERSONALITY_PETRI: return BOT_BEHAVIOR_PETRI
+        elif pers == BOT_PERSONALITY_TRACKER: return BOT_BEHAVIOR_TRACKER
+        elif pers == BOT_PERSONALITY_PETRI_AND_GATHER: 
+            if self.turn % 100 <50:
+            # if self.turn % 30 <15:
+                return BOT_BEHAVIOR_PETRI
+            else:
+                return BOT_BEHAVIOR_GATHER
+        elif pers == BOT_PERSONALITY_GROW_PETRI_AND_GATHER: 
+            if self.turn % 75 < 25:
+                return BOT_BEHAVIOR_GROW
+            elif self.turn % 75 < 50:
+                return BOT_BEHAVIOR_PETRI            
+            else:
+                return BOT_BEHAVIOR_GATHER            
+            
+        elif pers == BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK:
+            if self.turn % 100 < 25:
+                return BOT_BEHAVIOR_GROW
+            elif self.turn % 100 < 50:
+                return BOT_BEHAVIOR_PETRI      
+            elif self.turn % 100 < 75:      
+                return BOT_BEHAVIOR_GATHER  
+            else:
+                return BOT_BEHAVIOR_TRACKER
+        
+
     def bot_turn(self, bot_num):
-        behavior = self.players[bot_num].bot_behavior
+        behavior =  self.get_bot_behavior(bot_num)
         if behavior == BOT_BEHAVIOR_PETRI:
             self.players[bot_num].run_petri_growth_check() 
 
         elif behavior == BOT_BEHAVIOR_TRACKER:
             self.players[bot_num].run_tracker_behavior_check() 
         
-        elif behavior == BOT_BEHAVIOR_GROW_ONLY:
+        elif behavior == BOT_BEHAVIOR_GROW:
             self.players[bot_num].run_grower_growth_check() 
 
-        elif behavior == BOT_BEHAVIOR_AMBUSH_ONLY:
+        elif behavior == BOT_BEHAVIOR_AMBUSH:
             self.players[bot_num].run_ambush_check() 
+        
+        elif behavior == BOT_BEHAVIOR_GATHER:
+            self.players[bot_num].gather_troops() 
         
 
     def tick(self): # move / attack / takeover 
@@ -864,7 +895,7 @@ class MadmiralsGameInstance:
         
 
     class GamePlayer:
-        def __init__(self, parent, user_id, user_desc, color_bg, color_fg, bot_behavior=None):
+        def __init__(self, parent, user_id, user_desc, color_bg, color_fg, bot_personality=None):
             self.parent = parent
             self.user_id = user_id
             self.user_desc = user_desc
@@ -881,7 +912,7 @@ class MadmiralsGameInstance:
 
             self.player_queue = self.ActionQueue(self)
 
-            self.bot_behavior = bot_behavior # what role(s) should this entity perform? None if regular player -- could do this as a dict of one or more behaviors!
+            self.bot_personality = bot_personality # what role(s) should this entity perform? None if regular player -- could do this as a dict of one or more behaviors!
 
             self.right_click_pending_address = None # if the player right clicked on a cell, be ready to move half of troops instead of all
             self.commando_mode = False # if true, attempt to move ALL troops instead of all but one
@@ -1020,8 +1051,6 @@ class MadmiralsGameInstance:
 
         def run_grower_growth_check(self):
             if not self.active: return
-            
-            print('run_grower_growth_check')
             # Grow into any open squares available
             # Idea 1: If none available, attack empty ships. If none of those touching, then attack occupied blank cells, then attack adjacent admirals/ships. If none, attack mountains
             # Idea 2: If no open squares available, just wait. If not blocked in entirely, new troops will eventually spawn at the edges. But this will be pretty lame if bot only does this
@@ -1054,7 +1083,7 @@ class MadmiralsGameInstance:
                     if self.target_cell.owner == self.source_cell.owner: self.desirability -= 10 # prefer growing over retreading
                     if self.target_cell.owner != None: self.desirability -= 5 # prefer new territory over direct conflict
                     
-                    print(self.target_cell.row, self.target_cell.col, self.dir, self.troop_diff, self.desirability)
+                    # print(self.target_cell.row, self.target_cell.col, self.dir, self.troop_diff, self.desirability)
                     
             potential_moves = []
             
@@ -1093,15 +1122,67 @@ class MadmiralsGameInstance:
             if not self.active: return
             print('todo run_ambush_check')
 
-        def run_gather_behavior(self):
+
+        def gather_troops(self):
+        # pick an owned, non-entity cell with more than one cell (maybe weighted towards the one with the most troops?) and set in an ACTION_MOVE_NORMAL A* course to the nearest admiral
             if not self.active: return
-            print('todo run_gather_behavior')            
+
+            MOVE_THRESHOLD = 2
+            if len(self.player_queue.queue) < 1:
+                row_order = list(range(self.parent.num_rows))
+                col_order = list(range(self.parent.num_cols))
+                random.shuffle(row_order) # Shuffle the order to improve the randomness of results 
+                random.shuffle(col_order) # - otherwise there would be noticeable waves pf top left to bottom right moves
+                
+                s_cell = None  # s for source/start
+                t_cell_address = None  # t for target
+
+                for i in row_order:                     
+                    for j in col_order:
+                        if s_cell is None:
+                            check_cell = self.parent.game_board[(i,j)]
+                            if check_cell.owner == self.user_id and check_cell.troops >= MOVE_THRESHOLD and check_cell.entity_type == None:          
+                                print(f'move this one: {i},{j}')    
+                                # pick a destination
+                                s_cell = check_cell
+                                t_cell_address, t_cell_dist = self.parent.closest_instance_of_entity(ENTITY_TYPE_ADMIRAL, (i, j), entity_owner=self.user_id)     
+                                print(t_cell_address)
+
+                if t_cell_address is not None:
+                    t_cell = self.parent.game_board[t_cell_address]
+                    # now the hard part - linking up the A* algorithm to the game
+                    board = self.get_game_board_in_path_finder_speak(t_cell)
+                    # board.print_board()
+                    a_star = AStar(board)
+                    path = a_star.find_path((s_cell.row, s_cell.col), (t_cell.row, t_cell.col))
+                    if path is None: 
+                        print('NO PATH FOUND')
+                        pass 
+                        
+                    else:
+                        #print('PATH FOUND')
+                        for i in range(len(path)-1):
+                            if path[i+1][0] > path[i][0]:
+                                dir = DIR_DOWN
+                            elif path[i+1][0] < path[i][0]:
+                                dir = DIR_UP
+                            elif path[i+1][1] > path[i][1]:
+                                dir = DIR_RIGHT
+                            elif path[i+1][1] < path[i][1]:
+                                dir = DIR_LEFT
+                            else:
+                                raise ValueError('Unexpected jump in found path')
+                        
+                            self.player_queue.add_action_to_queue(path[i], ACTION_MOVE_NORMAL, dir)
+
+                
+                
 
         def run_tracker_behavior_check(self, intensity=3):
             if not self.active: return 
             
             ATTACK_THRESHOLD = 10
-            if False and random.randint(1, intensity) == intensity: # adjust this range to adjust the frequency of defaulting to a petri check
+            if False and random.randint(1, intensity) == intensity: # adjust this range to adjust the frequency of defaulting to a petri check #TODO remove False or remove line
                     self.run_petri_growth_check() # this encourages more growth and less spreading itself thin
                 
             elif len(self.player_queue.queue) < 1:

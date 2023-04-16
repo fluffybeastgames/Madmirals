@@ -57,22 +57,25 @@ ACTION_CHARGE = 777 # idea: start a chain of move_normals that extends to the ed
 ACTION_QUEUE_MAX_SIZE = 100 # do not accept new queued moves if the player has this many pending
 
 
+BOT_PERSONALITY_PETRI = 101 # all petri all the time
+BOT_PERSONALITY_TRACKER = 102 # always on the hunt
+BOT_PERSONALITY_GROW_ONLY = 103 # james and the giant reach
+BOT_PERSONALITY_AMBUSH_ONLY = 104 # crouching bot, hidden bot
+BOT_PERSONALITY_PETRI_AND_GATHER = 105 # like herding cats
+BOT_PERSONALITY_GROW_PETRI_AND_GATHER = 106
+BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK = 107
+
 # Currently the bot's entire personality, but different behavior checks for the same bot should be built later on
-# TODO rename these to be more logically consistent - eg BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL is a set of actions to perform while acting out a different 'behavior'
 BOT_BEHAVIOR_PETRI = 1 # Analyzes current board state and comes up with a weighted list of suggested moves; a weighted sort picks one. Chaotic and shortsighted, but not totally stupid.
 BOT_BEHAVIOR_TRACKER = 2 # Picks a ship or admiral on the board and queues up an A*-generated list of move towards the target. Initial version may also default to petri-ing
+BOT_BEHAVIOR_GROW = 14 # Programmed to grow into empty spaces when possible, resorting to combat and other operations when needed. Waits if it can't find a valid move
+BOT_BEHAVIOR_AMBUSH = 15 # Waits until it is touched by an enemy.. as soon as one of its entities has enough troops to overwhelm the troops along the A* to the nearest touching entity, queue it up to move like the tracker
+BOT_BEHAVIOR_GATHER = 16 # pick an owned, non-entity cell with more than one cell (maybe weighted towards the one with the most troops?) and set in an ACTION_MOVE_NORMAL A* course to the nearest admiral
+
+# TODO rename these to be more logically consistent - eg BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL is a set of actions to perform while acting out a different 'behavior'
 BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL = 11 # Currently used by the tracker behavior to queue up different actions in one go
 BOT_BEHAVIOR_MOVE_HALF_THEN_ALL = 12 # Currently used by the tracker behavior to queue up different actions in one go
 BOT_BEHAVIOR_MOVE_ALL = 13 # Currently used by the tracker behavior to queue up the same action each time, used alongside the "move half then ..." actions
-BOT_BEHAVIOR_GROW_ONLY = 14 # Programmed to grow into empty spaces when possible, resorting to combat and other operations when needed. Waits if it can't find a valid move
-BOT_BEHAVIOR_AMBUSH_ONLY = 15 # Waits until it is touched by an enemy.. as soon as one of its entities has enough troops to overwhelm the troops along the A* to the nearest touching entity, queue it up to move like the tracker
-BOT_BEHAVIOR_GATHER = 16 # pick an owned, non-entity cell with more than one cell (maybe weighted towards the one with the most troops?) and set in an ACTION_MOVE_NORMAL A* course to the nearest admiral
-
-BOT_PERSONALITY_PETRI = 101 # all petri all the time
-BOT_BEHAVIOR_TRACKER = 102 # always on the hunt
-BOT_BEHAVIOR_GROW_ONLY = 103 # james and the giant reach
-BOT_BEHAVIOR_AMBUSH_ONLY = 104 # crouching bot, hidden bot
-BOT_BEHAVIOR_PETRI_AND_GATHER = 105 # like herding cats
 
 
 ### GUI
@@ -135,9 +138,10 @@ REPLAY_DATA_COL_TURN = 0
 REPLAY_DATA_COL_ROW = 1
 REPLAY_DATA_COL_COL = 2
 REPLAY_DATA_COL_CELLTYPE = 3
-REPLAY_DATA_COL_ENTITY_TYPE = 4
-REPLAY_DATA_COL_UID = 5
-REPLAY_DATA_COL_TROOPS = 6
+REPLAY_DATA_COL_TERRAIN_TYPE = 4
+REPLAY_DATA_COL_ENTITY_TYPE = 5
+REPLAY_DATA_COL_UID = 6
+REPLAY_DATA_COL_TROOPS = 7
 
 
 # Describes how many often to increment the troops in a cell. eg rate=2 will grow every other turn
