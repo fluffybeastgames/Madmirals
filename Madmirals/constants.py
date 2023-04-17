@@ -32,16 +32,12 @@ ENTITY_TYPE_SHIP_4 = 204 # combine 2 ship_2s or 1 ship_3 and 1 ship to make this
 ENTITY_TYPE_INFANTRY = 205
 
 
-
-
-
-
-GAME_STATUS_INIT = 'Init' # loading
-GAME_STATUS_READY = 'Ready' # able to start
-GAME_STATUS_IN_PROGRESS = 'In Progress' #
-GAME_STATUS_PAUSE = 'Paused' #
-GAME_STATUS_GAME_OVER_WIN = 'Won' # game instance is complete and can no longer be played
-GAME_STATUS_GAME_OVER_LOSE = 'Lost' # game instance is complete and can no longer be played
+GAME_STATUS_INIT = 0 # loading
+GAME_STATUS_READY = 1 # able to start
+GAME_STATUS_IN_PROGRESS = 2 #
+GAME_STATUS_PAUSE = 3 #
+GAME_STATUS_GAME_OVER_WIN = 4 # game instance is complete and can no longer be played
+GAME_STATUS_GAME_OVER_LOSE = 5 # game instance is complete and can no longer be played
 
 GAME_MODE_FFA = 1
 GAME_MODE_FFA_CUST = 2
@@ -64,6 +60,10 @@ BOT_PERSONALITY_AMBUSH_ONLY = 104 # crouching bot, hidden bot
 BOT_PERSONALITY_PETRI_AND_GATHER = 105 # like herding cats
 BOT_PERSONALITY_GROW_PETRI_AND_GATHER = 106
 BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK = 107
+BOT_PERSONALITY_GROW_GATHER_SAIL_COMBINE = 108
+BOT_PERSONALITY_GROW_GATHER_SAIL_ATTACK = 109
+BOT_PERSONALITY_MIX_IT_UP = 110
+
 
 # Currently the bot's entire personality, but different behavior checks for the same bot should be built later on
 BOT_BEHAVIOR_PETRI = 1 # Analyzes current board state and comes up with a weighted list of suggested moves; a weighted sort picks one. Chaotic and shortsighted, but not totally stupid.
@@ -71,6 +71,11 @@ BOT_BEHAVIOR_TRACKER = 2 # Picks a ship or admiral on the board and queues up an
 BOT_BEHAVIOR_GROW = 14 # Programmed to grow into empty spaces when possible, resorting to combat and other operations when needed. Waits if it can't find a valid move
 BOT_BEHAVIOR_AMBUSH = 15 # Waits until it is touched by an enemy.. as soon as one of its entities has enough troops to overwhelm the troops along the A* to the nearest touching entity, queue it up to move like the tracker
 BOT_BEHAVIOR_GATHER = 16 # pick an owned, non-entity cell with more than one cell (maybe weighted towards the one with the most troops?) and set in an ACTION_MOVE_NORMAL A* course to the nearest admiral
+BOT_BEHAVIOR_COMBINE_SHIPS = 17 # Attempt to combine two friendly ships. If no friendly ships exist, see if there are any neutral ships nearby w/ enough 
+BOT_BEHAVIOR_ATTACK_SHIP = 18 # If a friendly ship has a distance-weighted troop advantage over an enemy ship or admiral, sail towards it
+BOT_BEHAVIOR_SAIL_AROUND = 19 # Prioritize expanding via ship. If no ships are available, try to capture one
+
+
 
 # TODO rename these to be more logically consistent - eg BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL is a set of actions to perform while acting out a different 'behavior'
 BOT_BEHAVIOR_MOVE_HALF_THEN_NORMAL = 11 # Currently used by the tracker behavior to queue up different actions in one go
@@ -150,3 +155,30 @@ SHIP_GROW_RATE = 6
 BLANK_GROW_RATE = 25
 SWAMP_DRAIN_RATE = 1
 BROKEN_MTN_GROW_RATE = 50
+
+
+def get_personality_name(num):
+    if num == BOT_PERSONALITY_PETRI: return 'Petri Dish'
+    elif num == BOT_PERSONALITY_TRACKER: return 'Tracker'
+    elif num == BOT_PERSONALITY_GROW_ONLY: return 'Gardener'
+    elif num == BOT_PERSONALITY_AMBUSH_ONLY: return 'Ambush Pred'
+    elif num == BOT_PERSONALITY_PETRI_AND_GATHER: return 'Petri Gatherer'
+    elif num == BOT_PERSONALITY_GROW_PETRI_AND_GATHER: return 'Petri Gardener'
+    elif num == BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK: return 'Petri Tracker'
+    elif num == BOT_PERSONALITY_GROW_GATHER_SAIL_COMBINE: return 'Sailor'
+    elif num == BOT_PERSONALITY_GROW_GATHER_SAIL_ATTACK: return 'Seaman'
+    elif num == BOT_PERSONALITY_MIX_IT_UP: return 'Sir Mix Up'
+    else: raise ValueError('Invalid personality matrix detected')
+
+def get_behavior_name(num):
+    if num == BOT_BEHAVIOR_PETRI: return 'Petri'
+    elif num == BOT_BEHAVIOR_TRACKER: return 'Tracking'
+    elif num == BOT_BEHAVIOR_GROW: return 'Growing'
+    elif num == BOT_BEHAVIOR_AMBUSH: return 'Ambush'
+    elif num == BOT_BEHAVIOR_GATHER: return 'Gathering'
+    elif num == BOT_BEHAVIOR_COMBINE_SHIPS: return 'Combining'
+    elif num == BOT_BEHAVIOR_ATTACK_SHIP: return 'Attack ship'
+    elif num == BOT_BEHAVIOR_SAIL_AROUND: return 'Sailing'
+    elif num is None: return 'None'
+    
+    else: raise ValueError('Invalid behavior pattern detected')

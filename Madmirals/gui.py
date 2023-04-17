@@ -27,12 +27,16 @@ class MadmiralsGUI:
         self.frame_scoreboard = tk.Frame(master=self.root) # List of players sorted by score, descending. Includes header labels, including current turn no
         self.frame_tide_chart = tk.Frame(master=self.root) # Current and upcoming tides and timers        
         self.frame_win_conditions = tk.Frame(master=self.root) # Explains the current game mode
+        self.frame_victory = tk.Frame(master=self.root) # Pops up over the game board when the player wins or loses
+                
         self.frame_debug = tk.Frame(master=self.root) # When enabled, displays performance stats such as FPS
         self.frame_chat_log = tk.Frame(master=self.root) # A log of game events.. primarily 
 
         self.cell_font_size = DEFAULT_FONT_SIZE
         self.label_size = DEFAULT_LABEL_SIZE
         self.font_buttons = (f'Arial {self.cell_font_size} bold')
+
+        self.game_over_rendered = False # render once after game over then cease
             
         self.apply_binds()
 
@@ -65,6 +69,7 @@ class MadmiralsGUI:
         self.populate_tide_frame()
         self.populate_win_conditions_frame()
         self.populate_debug_frame()
+        self.game_over_rendered = False
 
 
     def open_about_window(self):
@@ -92,6 +97,7 @@ class MadmiralsGUI:
         self.root.bind('<Control-F>', self.toggle_fog_of_war)
         self.root.bind('<Control-f>', self.toggle_fog_of_war)
         self.root.bind('<Control-D>', self.toggle_debug_mode)
+        self.root.bind('<Control-d>', self.toggle_debug_mode)
         self.root.bind('<Control-O>', self.open_replay_window)
         self.root.bind('<Control-o>', self.open_replay_window)
         
@@ -131,34 +137,53 @@ class MadmiralsGUI:
             player_name=player_name)            
 
         self.frame_splash_screen.grid_remove()
+        self.frame_victory.grid_remove()
 
-    def btn_left_click(self, address, event):
+    def btn_action_normal(self): # When the user clicks this, it's to cancel move all / move half mode
+        self.frame_controls.btn_action_normal.config(state='disabled', relief='sunken')
+        self.frame_controls.btn_action_move_all.config(state='normal', relief='raised')
+        self.frame_controls.btn_action_move_half.config(state='normal', relief='raised')
+        self.parent.game.players[PLAYER_ID].commando_mode = False
+        self.parent.game.players[PLAYER_ID].right_click_pending_address = None
+
+    
+    def btn_action_move_all(self): # The equivalent of middle clicking on active cell
+        self.frame_controls.btn_action_normal.config(state='normal', relief='raised')
+        self.frame_controls.btn_action_move_all.config(state='disabled', relief='sunken')
+        self.frame_controls.btn_action_move_half.config(state='normal', relief='raised')    
+        self.parent.game.players[PLAYER_ID].commando_mode = True
+        self.parent.game.players[PLAYER_ID].right_click_pending_address = None    
+
+    def btn_action_move_half(self): # The equivalent of right clicking on active cell
+        self.frame_controls.btn_action_normal.config(state='normal', relief='raised')
+        self.frame_controls.btn_action_move_all.config(state='normal', relief='raised')
+        self.frame_controls.btn_action_move_half.config(state='disabled', relief='sunken')        
+        self.parent.game.players[PLAYER_ID].right_click_pending_address = self.parent.game.active_cell
+
+
+    def cell_left_clicked(self, address, event): # Handler for a game cell being left clicked
         self.parent.game.move_active_cell(new_address=address)
-        player_id = 0
-        self.parent.game.players[player_id].commando_mode = False
             
-    def btn_middle_click(self, address, event):
-        player_id = 0
-        
-        if self.parent.game.active_cell == address: # if we are middle clicking on the already active cell, toggle retreat mode
-            self.parent.game.players[player_id].commando_mode = not self.parent.game.players[player_id].commando_mode
-        else:
-            self.parent.game.players[player_id].commando_mode = True
+    def cell_middle_clicked(self, address, event): # Handler for a game cell being middle clicked
+        # if we are middle clicking on the already active cell, toggle retreat mode
+        if self.parent.game.active_cell == address and self.parent.game.players[PLAYER_ID].commando_mode:
+            self.btn_action_normal()
+        else: # Otherwise activate/keep mode in commando mode, and cancel any pending right clicks
+            self.btn_action_move_all()
 
         self.parent.game.active_cell = address
         
-    def btn_right_click(self, address, event):
+    def cell_right_clicked(self, address, event): # Handler for a game cell being right clicked
         #print('right click = activate "move half" mode for next action')
         self.parent.game.active_cell = address
-        player_id = 0 # TODO THIS NEEDS TO BE UPDATED
-        self.parent.game.players[player_id].commando_mode = False
-        self.parent.game.players[player_id].right_click_pending_address = address
+        
+        self.parent.game.players[PLAYER_ID].commando_mode = False
+        self.parent.game.players[PLAYER_ID].right_click_pending_address = address
     
     def key_press_handler(self, event):
         CHAR_ESCAPE = '\x1b'
         interesting_chars = ['W', 'w', 'A', 'a', 'S','s', 'D', 'd', 'E', 'e', CHAR_ESCAPE, '-', '=', '0', 'P', 'p', 'Q', 'q']
         interesting_syms = ['Up', 'Down', 'Left', 'Right']
-        player_id = 0 # TODO THIS NEEDS TO BE UPDATED
         
         if self.parent.game is not None and (event.char in interesting_chars or event.keysym in interesting_syms):
             active_cell_address = self.parent.game.active_cell
@@ -178,8 +203,8 @@ class MadmiralsGUI:
                     self.zoom_reset()
 
             elif event.char in ['E', 'e']: # undo most recent action in queue
-                if len(self.parent.game.players[player_id].player_queue.queue)>0:
-                    last_action = self.parent.game.players[player_id].player_queue.pop_queued_action(-1)
+                if len(self.parent.game.players[PLAYER_ID].player_queue.queue)>0:
+                    last_action = self.parent.game.players[PLAYER_ID].player_queue.pop_queued_action(-1)
 
                     if last_action:
                         self.parent.game.active_cell = last_action.source_address
@@ -188,7 +213,7 @@ class MadmiralsGUI:
                 self.toggle_pause()
 
             elif event.char in ['Q', 'q']: # undo a step
-                self.parent.game.players[player_id].player_queue.queue.clear()
+                self.parent.game.players[PLAYER_ID].player_queue.queue.clear()
                         
             elif self.parent.game.active_cell:
                 # print(f'char {event.char} pressed. Active cell is {active_cell_address}')
@@ -200,17 +225,24 @@ class MadmiralsGUI:
                 else:
                     raise ValueError('Unexpected keyboard input')
 
-                if self.parent.game.players[player_id].right_click_pending_address == active_cell_address:
+                if self.parent.game.players[PLAYER_ID].right_click_pending_address == active_cell_address:
                     action = ACTION_MOVE_HALF
-                elif self.parent.game.players[player_id].commando_mode:
-                    action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/cities
+                    
+                    # after moving half, revert to either normal or 'commando' mode
+                    if self.parent.game.players[PLAYER_ID].commando_mode: 
+                        self.btn_action_move_all() 
+                    else:
+                        self.btn_action_normal() # after moving half, revert to either normal or 'commando' mode
+                
+                elif self.parent.game.players[PLAYER_ID].commando_mode:
+                    action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/ships
                 else:
                     action = ACTION_MOVE_NORMAL
         
-                self.parent.game.players[player_id].player_queue.add_action_to_queue(active_cell_address, action, dir) 
+                self.parent.game.players[PLAYER_ID].player_queue.add_action_to_queue(active_cell_address, action, dir) 
 
                 self.parent.game.move_active_cell(dir=dir)
-                self.parent.game.players[player_id].right_click_pending_address = None
+                self.parent.game.players[PLAYER_ID].right_click_pending_address = None
             
     def create_menu_bar(self, root):
         menubar = tk.Menu(root)
@@ -276,6 +308,10 @@ class MadmiralsGUI:
     def toggle_debug_mode(self, event=None): # TODO move to game manager
         self.parent.debug_mode = not self.parent.debug_mode
         print(f'Set debug mode to {self.parent.debug_mode}')
+        if self.parent.debug_mode:
+            self.frame_debug.grid(row=3, column=9, sticky='NEWS',  pady=(0, 0), padx=(15,15))
+        else:
+            self.frame_debug.grid_remove()
 
     def open_replay_window(self, event=None):
         if self.parent.game is not None and self.parent.game.game_status == GAME_STATUS_IN_PROGRESS:
@@ -596,6 +632,21 @@ class MadmiralsGUI:
             self.top.destroy()
             # self.top = None
                     
+    # def populate_frame_victory(self, text):
+    #     if self.frame_victory is not None: self.frame_victory.destroy()
+    #     self.frame_victory = tk.Frame(master=self.root, width=250, height=250, bg=COLOR_TIDE_HIGH)
+    #     lbl_header = tk.Label(self.frame_victory, text=text, font='Arial 18 bold', bg=COLOR_TIDE_HIGH, fg='#FFFFFF')
+    #     btn_new_game = tk.Button(
+    #         master=self.frame_victory, 
+    #         text='New Game', width=14, height=2, 
+    #         command=self.open_game_settings, bg='light blue', font='Arial 18 bold')
+        
+    #     lbl_header.grid(row=0, column=0, padx=30, pady=(30, 15))
+    #     btn_new_game.grid(row=5, column=0, padx=30, pady=15)
+        
+    #     self.frame_victory.grid(row=4, column=0, sticky='NEWS')
+    #     #self.frame_game_board.grid(row=0, column=0, rowspan=10, pady=(15,15), padx=(15, 15), ipadx=25, ipady=25)
+        
 
     def populate_splash_screen(self):
         # def open_game_from_splash(self):
@@ -636,10 +687,15 @@ class MadmiralsGUI:
         canvas.config(width=250,height=250)
         canvas.config(xscrollcommand=hbar.set, yscrollcommand=vbar.set)
         
-        canvas.grid(column=0, row=0, sticky=(tk.N,tk.W,tk.E,tk.S), padx=(45,0),pady=(45,0))
-        hbar.grid(row=1, column=0, sticky='ew', padx=(45,0))
-        vbar.grid(row=0, column=1, sticky='ns', pady=(45,0))
+        self.frame_controls = tk.Frame(master=self.frame_game_board)
+        self.frame_controls.btn_action_normal = tk.Button(master=self.frame_controls, text='NORMAL', width=15, font='Arial 15', command=self.btn_action_normal, state='disabled', relief='sunken')
+        self.frame_controls.btn_action_move_all = tk.Button(master=self.frame_controls, text='MOVE ALL', width=15, font='Arial 15', command=self.btn_action_move_all, state='normal', relief='raised')
+        self.frame_controls.btn_action_move_half = tk.Button(master=self.frame_controls, text='MOVE HALF', width=15, font='Arial 15', command=self.btn_action_move_half, state='normal', relief='raised')
         
+        self.frame_controls.btn_action_normal.grid(row=0, column=0)
+        self.frame_controls.btn_action_move_all.grid(row=0, column=1)
+        self.frame_controls.btn_action_move_half.grid(row=0, column=2)
+    
         self.frame_buttons = tk.Frame(master=canvas)
         self.board_cell_buttons = {}
         
@@ -652,12 +708,17 @@ class MadmiralsGUI:
                 self.board_cell_buttons[(i, j)].grid(row=i, column=j) # place the cell in the frame
 
                 # Add binds so that button clicks are processed
-                self.board_cell_buttons[(i, j)].bind('<Button-1>', partial(self.btn_left_click, (i,j)))
-                self.board_cell_buttons[(i, j)].bind('<Button-2>', partial(self.btn_middle_click, (i,j)))
-                self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.btn_right_click, (i,j)))
+                self.board_cell_buttons[(i, j)].bind('<Button-1>', partial(self.cell_left_clicked, (i,j)))
+                self.board_cell_buttons[(i, j)].bind('<Button-2>', partial(self.cell_middle_clicked, (i,j)))
+                self.board_cell_buttons[(i, j)].bind('<Button-3>', partial(self.cell_right_clicked, (i,j)))
         
-        self.frame_buttons.grid(row=0, column=0)
-        self.frame_game_board.grid(row=0, column=0, rowspan=10, pady=(15,15), padx=(15, 15), ipadx=25, ipady=25)
+        
+        canvas.grid(column=0, row=1, sticky=(tk.N,tk.W,tk.E,tk.S), padx=(45,0),pady=(30,0)) # master = frame_game_board
+        hbar.grid(row=2, column=0, sticky='ew', padx=(45,0)) # master = frame_game_board
+        vbar.grid(row=1, column=1, sticky='ns', pady=(10,0)) # master = frame_game_board
+        self.frame_controls.grid(row=0, column=0, pady=10) # master = frame_game_board
+        self.frame_buttons.grid(row=0, column=0) # master = canvas
+        self.frame_game_board.grid(row=0, column=0, rowspan=10, pady=(15,15), padx=(15, 15), ipadx=25, ipady=25) # master = root
         self.frame_game_board.focus_set()
 
     def populate_scoreboard_frame(self):
@@ -764,14 +825,23 @@ class MadmiralsGUI:
         self.frame_debug.lbl_fps = tk.Label(master=self.frame_debug, text=999, font=('Arial 12 bold'))
         self.frame_debug.lbl_game_status = tk.Label(master=self.frame_debug, text=GAME_STATUS_INIT, font=('Arial 12 bold'))
         self.frame_debug.lbl_seed = tk.Label(master=self.frame_debug, text='0123456789', font=('Arial 12 bold'))
+        self.frame_debug.lbl_bot_desc = tk.Label(master=self.frame_debug, text='BOT INFO', font=('Arial 10'), anchor='w', justify=tk.LEFT)
+        self.frame_debug.lbl_bot_personality = tk.Label(master=self.frame_debug, text='PERS', font=('Arial 10'), anchor='e', justify=tk.RIGHT)
+        self.frame_debug.lbl_bot_last_behavior = tk.Label(master=self.frame_debug, text='BEHAV', font=('Arial 10'), anchor='e', justify=tk.RIGHT)
+        self.frame_debug.lbl_bot_troops = tk.Label(master=self.frame_debug, text='TROOP', font=('Arial 10'), anchor='e', justify=tk.RIGHT)
 
         self.frame_debug.lbl_frames.grid(row=2, column=0, sticky='E', padx=10)
         self.frame_debug.lbl_time.grid(row=2, column=1, sticky='E', padx=10)
         self.frame_debug.lbl_fps.grid(row=2, column=2, sticky='E', padx=10)
         self.frame_debug.lbl_game_status.grid(row=2, column=3, sticky='W', padx=10)
         self.frame_debug.lbl_seed.grid(row=2, column=4, sticky='W', padx=10)
+        self.frame_debug.lbl_bot_desc.grid(row=3, column=0, columnspan=2, sticky='W', padx=10)
+        self.frame_debug.lbl_bot_personality.grid(row=3, column=2, sticky='E', padx=10)
+        self.frame_debug.lbl_bot_last_behavior.grid(row=3, column=3, sticky='E', padx=10)
+        self.frame_debug.lbl_bot_troops.grid(row=3, column=4, sticky='E', padx=10)
         
-        self.frame_debug.grid(row=3, column=9, sticky='NEWS',  pady=(0, 0), padx=(15,15))
+        
+        # self.frame_debug.grid(row=3, column=9, sticky='NEWS',  pady=(0, 0), padx=(15,15))
 
     def populate_win_conditions_frame(self):
         if not self.frame_win_conditions is None:
@@ -914,11 +984,31 @@ class MadmiralsGUI:
         elapsed = round(time.time() - self.parent.game.game_creation_time, 1)
         fps = round(frames/elapsed, 1)
 
+        str_bot_info = 'Bot'
+        str_bot_personality = 'Personality'
+        str_bot_last_behavior = 'Last Action'
+        str_bot_troops = 'Troops'
+        
+        for i in range(self.parent.game.num_players):
+            p = self.parent.game.players[i]
+            if p.bot_personality is not None:
+                str_bot_info = str_bot_info + f'\n{p.user_id}\t{p.user_desc}'
+                str_bot_personality = str_bot_personality + f'\n{get_personality_name(p.bot_personality)}'
+                str_bot_last_behavior = str_bot_last_behavior + f'\n{get_behavior_name(p.bot_last_behavior)}'
+                str_bot_troops = str_bot_troops + f'\n{p.troops}'
+                
+                
         self.frame_debug.lbl_frames.config(text=frames)
         self.frame_debug.lbl_time.config(text=elapsed)        
         self.frame_debug.lbl_fps.config(text=fps)
-        self.frame_debug.lbl_game_status.config(text=self.parent.game.game_status)
+        self.frame_debug.lbl_game_status.config(text=self.parent.game.get_game_status_text())
         self.frame_debug.lbl_seed.config(text=self.parent.game.seed)
+
+        self.frame_debug.lbl_bot_desc.config(text=str_bot_info)
+        self.frame_debug.lbl_bot_personality.config(text=str_bot_personality)
+        self.frame_debug.lbl_bot_last_behavior.config(text=str_bot_last_behavior)
+        self.frame_debug.lbl_bot_troops.config(text=str_bot_troops)
+        
 
         
     def update_chat_log_frame(self):
@@ -927,12 +1017,13 @@ class MadmiralsGUI:
         
     def render_game_over(self): # make any visual updates to reflect that the game status is currently game over
         # print('game over, man')
-        self.parent.fog_of_war = False
-        self.parent.game_settings_changed_this_turn = True
-        self.render()
-        # self.populate_frame_victory("You Win and/or Lose!")
-        pass
-    
+        if not self.game_over_rendered:
+            self.game_over_rendered = True
+            self.parent.fog_of_war = False
+            self.parent.game_settings_changed_this_turn = True
+            self.render()
+            # self.populate_frame_victory("You Win and/or Lose!")
+
        
     def is_color_dark(self, color):
     # Takes a color formatted like #FF00FF and tries to determine whether the color is 'dark' or not

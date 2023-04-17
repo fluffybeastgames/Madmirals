@@ -3,8 +3,8 @@ import time
 
 class AStar:
     
-    def __init__(self):
-        self.board = None
+    def __init__(self, board=None):
+        self.board = board
 
     def address_in_list(address, node_set):
     # Returns true if the node exists in the specified list of nodes (open or closed)
@@ -16,7 +16,6 @@ class AStar:
 
     def update_node(new_node, node_set):
     # If more than one reference to the same cell exists in the open set, make sure to preserve the one w/ a lower g score, since it's going to result in a lower f
-        # print('ya ta')
         for i in node_set:
             if i.address == new_node.address: 
                 if new_node.g < i.g:
@@ -39,10 +38,10 @@ class AStar:
                 self.col = col
                 self.traversable = True
                 
-                if row%2==0 and col%2==0: self.traversable = False # 'random' little barriers
-                if row%3==0 and col%2==0: self.traversable = False # 'random' little barriers
-                if row%3==0 and col%3==0: self.traversable = False # 'random' little barriers
-                if row == 6 and col == 7: self.traversable = False
+                # if row%2==0 and col%2==0: self.traversable = False # 'random' little barriers
+                # if row%3==0 and col%2==0: self.traversable = False # 'random' little barriers
+                # if row%3==0 and col%3==0: self.traversable = False # 'random' little barriers
+                # if row == 6 and col == 7: self.traversable = False
 
         def __init__(self, rows, cols):# start, target):
             self.rows = rows 
@@ -56,7 +55,6 @@ class AStar:
                     out += "- " if self.board[r][c].traversable else "1 "
                 out += "\n"
             print(out)
-
 
     def find_path(self, start_address, target_address):
     # An implentation of an A* graph traversal program
@@ -78,7 +76,7 @@ class AStar:
             closed_set.append(current_square)
         
             if current_square.address == target_address:
-                print('We found it!')
+                #print('We found it!')
                 target_found = True
                 
             else:
