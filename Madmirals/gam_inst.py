@@ -91,106 +91,6 @@ class MadmiralsGameInstance:
         return closest_entity_address, closest_entity_distance # will return None if no entities found on map
 
 
-    # def closest_instance_of_entity(self, entity_type, starting_cell):
-    #     MAX_SEARCH_DEPTH = 3  # temp, should line up w/ user input
-
-    #     class SearchQueue:
-    #         def __init__(self):
-    #             self.queue = [] # an ordered list of SearchQueueItem cells to check, facilitating a breadth first approach to checking
-    #             self.addresses_already_searched = []
-    #             self.addresses_pending_search = []
-
-    #         def pop_next_search_item(self):
-    #             if len(self.queue) > 0:
-    #                 return self.queue.pop(0)
-    #             else:
-    #                 return None
-                
-    #         class SearchQueueItem:
-    #             def __init__(self, target_cell, distance, continue_left=True, continue_up=True, continue_down=True, continue_right=True):
-    #                 self.target_cell = target_cell
-    #                 self.distance = distance
-    #                 self.continue_left = continue_left
-    #                 self.continue_up = continue_up
-    #                 self.continue_down = continue_down
-    #                 self.continue_right = continue_right
-
-        
-    #     search_queue = SearchQueue()
-    #     search_queue.queue.append(search_queue.SearchQueueItem(starting_cell, distance=0))
-    #     #print(search_queue.queue[0].target_cell)
-
-    #     entity_found = False
-    #     distance = 0
-
-    #     print(f'Starting... first cell is ({search_queue.queue[0].target_cell.row}, {search_queue.queue[0].target_cell.col})')
-        
-    #     while(len(search_queue.addresses_already_searched) < self.num_rows*self.num_cols and not entity_found and distance <= MAX_SEARCH_DEPTH):
-    #         s_item = search_queue.pop_next_search_item()
-            
-    #         if s_item is not None:
-    #             # print(f''target cell{s_item.target_cell}')
-    #             row = s_item.target_cell.row
-    #             col = s_item.target_cell.col
-                
-    #             if (row, col) not in search_queue.addresses_already_searched:
-    #                 search_queue.addresses_already_searched.append((row, col))
-    #                 print(f'Checking \t{(row, col)}\t attempt {len(search_queue.addresses_already_searched)}\tDistance {s_item.distance}')    
-                    
-    #                 if s_item.target_cell.entity_type == entity_type:
-    #                     entity_found = True
-    #                     distance = s_item.distance
-                    
-    #                 else:
-    #                     if s_item.continue_left: # if this check looks left
-    #                         if col > 0: # if left is in bounds
-    #                             new_address = (row, col-1)
-    #                             if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
-    #                                 search_queue.addresses_pending_search.append(new_address)
-    #                                 new_cell = self.game_board[new_address]
-    #                                 search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
-                        
-    #                     if s_item.continue_up: # if this check looks up
-    #                         if row > 0:  # if move is in bounds
-    #                             new_address = (row-1, col)
-    #                             if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
-    #                                 search_queue.addresses_pending_search.append(new_address)
-    #                                 new_cell = self.game_board[new_address]
-    #                                 search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
-                            
-                        
-    #                     if s_item.continue_right: 
-    #                         if col < (self.num_cols-1): # if move is in bounds
-    #                             new_address = (row, col+1)
-    #                             if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
-    #                                 search_queue.addresses_pending_search.append(new_address)
-    #                                 new_cell = self.game_board[new_address]
-    #                                 search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
-                        
-    #                     if s_item.continue_down: 
-    #                         if row < (self.num_rows-1): # if move is in bounds
-    #                             new_address = (row+1, col)
-    #                             if new_address not in search_queue.addresses_already_searched and new_address not in search_queue.addresses_pending_search:
-    #                                 search_queue.addresses_pending_search.append(new_address)
-    #                                 new_cell = self.game_board[new_address]
-    #                                 search_queue.queue.append(search_queue.SearchQueueItem(new_cell, s_item.distance + 1))
-                        
-                        
-    #                 # if x: entity_found = True
-    #                 # else: add queue items to valid targets in valid continue_ directions
-    #                 # TODO here almost on the verge of greatness, or at least adequacy..
-                
-    #             else:
-    #                 print(f'Already checked ({s_item.target_cell.row}, {s_item.target_cell.col})')
-
-    #         else:
-    #             print('I think reaching this means at least one cell is blocked by eg mountains')
-    #             distance = -1
-
-    #     print(f'Escaped with a result of {distance}\t{s_item.target_cell.row}, {s_item.target_cell.col}')
-    #     return distance
-    
-
     def generate_game_world(self, starting_admiral_troops):
         print(f'Generating world with seed {self.seed}')
         if self.num_players is None:
@@ -796,7 +696,7 @@ class MadmiralsGameInstance:
                                 troops_to_add = 1
 
                                 if entity_type == ENTITY_TYPE_SHIP_2: troops_to_add = 2
-                                if entity_type == ENTITY_TYPE_SHIP_3: troops_to_add = 3 # bonus troops
+                                if entity_type == ENTITY_TYPE_SHIP_3: troops_to_add = 4 # bonus troops
                                 if entity_type == ENTITY_TYPE_SHIP_4: troops_to_add = 6 # bonus troops                                
 
                                 self.game_board[(i,j)].troops += troops_to_add

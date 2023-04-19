@@ -3,6 +3,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import colorchooser
 from functools import partial
+#from PIL import Image, ImageTk
 from PIL import Image, ImageTk
 import time
 
@@ -18,7 +19,7 @@ class MadmiralsGUI:
         self.about_window = None # self.AboutWindow(self)
         self.settings_window = None # except while open
 
-        self.root.config(menu=self.create_menu_bar(self.root))
+        self.root.config(menu=self.create_menu_bar())
         self.parent = parent
         
         self.frame_splash_screen = tk.Frame(master=self.root) # Shows at app startup, with buttons for New Game and How to Play
@@ -244,8 +245,8 @@ class MadmiralsGUI:
                 self.parent.game.move_active_cell(dir=dir)
                 self.parent.game.players[PLAYER_ID].right_click_pending_address = None
             
-    def create_menu_bar(self, root):
-        menubar = tk.Menu(root)
+    def create_menu_bar(self):
+        menubar = tk.Menu(self.root)
         
         filemenu = tk.Menu(menubar, tearoff=0)
         filemenu.add_command(label='New Game...', command=self.open_game_settings, accelerator='Ctrl+N')
