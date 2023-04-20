@@ -655,7 +655,14 @@ class MadmiralsGameInstance:
     def tick(self): # move / attack / takeover 
     # Advance the game by one turn
     # If the current "game" is a replay, process the turn in advance_replay()
-    # Otherwise, 
+    # Otherwise, each game turn encompasses 5 distinct phases:
+    #   -0. the .changed_this_turn flag is reset for each cell. This flag empowers us to do a sparse rendering when the frame updates at the end of the tick
+    #   -1. Each bot player queues 0, 1, or several moves, depending on their personality seting, current behavior mode, and game state
+    #   -2. Each player executes the next valid move in their stack, if any, discarding currently invalid moves as it goes
+    #   -3. The underlying simulation updates by 1 tick - cells grow or shrink if certain conditions are encountered 
+    #       (eg admirals grow every 2nd tick, while ship growth is less frequent and depends on number of masts/ship type)
+    #   -4. Cleanup and exit condition check - the scoreboard is updated, move are logged to the database, and check if the game ended on this turn
+
         self.turn += 1
 
         if self.game_mode == GAME_MODE_REPLAY:
@@ -744,7 +751,7 @@ class MadmiralsGameInstance:
             self.update_game_status()
 
 
-            if self.game_status == GAME_STATUS_GAME_OVER_WIN:
+            if self.game_status == GAME_STATUS_GAME_OVER_WIN: # TODO where is the game over lost check!?
                 #tk.messagebox.askokcancel(title='GG', message='gg')
                 self.fog_of_war = False
                 
@@ -868,8 +875,6 @@ class MadmiralsGameInstance:
             
             return desc, next_tide, next_tide_time, later_tide, later_tide_time, color, next_tide_color, later_tide_color
            
-        
-
     class GamePlayer:
         def __init__(self, parent, user_id, user_desc, color_bg, color_fg, bot_personality=None):
             self.parent = parent
@@ -918,30 +923,7 @@ class MadmiralsGameInstance:
             self.ships = num_ships
             self.troops = num_troops
             
-
-
-
-        # def update_land_count(self):
-        #     num_land = 0
-        #     for i in range(self.parent.num_rows):
-        #         for j in range(self.parent.num_cols):
-        #             if self.parent.game_board[(i,j)].owner == self.user_id:
-        #                 num_land += 1
-            
-        #     self.land = num_land
-            
-        # def update_troop_count(self):
-        #     num_troops = 0
-        #     for i in range(self.parent.num_rows):
-        #         for j in range(self.parent.num_cols):
-        #             if self.parent.game_board[(i,j)].owner == self.user_id:
-        #                 num_troops += self.parent.game_board[(i,j)].troops
-            
-        #     self.troops = num_troops
-
-
         class ActionQueue:
-            
             def __init__(self, parent):
                 self.parent = parent # a GamePlayer instance
                 self.queue = [] # a list of queued actions; each turn, the first valid action will be performed
@@ -981,8 +963,6 @@ class MadmiralsGameInstance:
                 else:
                     return None
             
-
-        
 
         def get_game_board_in_path_finder_speak(self, target_cell):
             # Reduce the board to an array of True/False, where False means there is an obstacle in the way
@@ -1265,14 +1245,13 @@ class MadmiralsGameInstance:
 
         def combine_ships(self):
             if not self.active: return 
-            print('combine_ships')
-
+            print('combine_ships - BOT_BEHAVIOR_COMBINE_SHIPS TODO')
 
             ##elif len(list_owned_boats) == 1  and len(list_neutral_boats) > 0:
 
         def attack_ship(self):
             if not self.active: return 
-            print('attack_ship')
+            print('attack_ship - BOT_BEHAVIOR_ATTACK_SHIP TODO')
                 
 
         def run_tracker_behavior_check(self, intensity=3):
@@ -1482,8 +1461,9 @@ class MadmiralsGameInstance:
                                 # if cell.troops > 2: # leave small troops to die
                                 #     if n is not None:
                                 pass
-                            
-                                                            
+            
+            # If we have at least one potential move identified, we now pick a move and queue it up.
+            # The move is selected using a weighted random selectin, where heigh values of list_weights[] are more likely to be selected.
             #print(f'len potential_moves is {len(potential_moves)}')
             if len(potential_moves) > 0:
                 list_weights = []
@@ -1495,12 +1475,7 @@ class MadmiralsGameInstance:
                 list_decided_move_or_moves = random.choices(potential_moves, weights=list_weights, k=num_moves_to_queue) # k indicates how many choices to return.. may be worth increasing above 1 to queue up multiple actions
                 first_moves_first = list_decided_move_or_moves[0]
 
-                #print((this_one.source_cell.row, this_one.source_cell.col), action=this_one.action, direction=this_one.dir)
                 self.player_queue.add_action_to_queue((first_moves_first.source_cell.row, first_moves_first.source_cell.col), action=first_moves_first.action, direction=first_moves_first.dir)
-
-                #self.queue.append(self.PendingAction(self.parent.user_id, source_address, action, direction))
-
-
 
     class MadCell:
         def __init__(self, parent, row, col, terrain_type=TERRAIN_TYPE_WATER, entity_type=None, owner=None):
@@ -1575,14 +1550,11 @@ class MadmiralsGameInstance:
 
             self.image = self.parent.parent.images.get_image_by_cell(self, icon_color)                 
 
-            
             # Lighten the cell it's the active (currently selected) cell to bring attention to it
             # Also darken the cell if it's adjacent to the active cell
             if self.parent.active_cell == (self.row, self.col):
                 bg = self.parent.parent.gui.adjust_color_brightness(bg, +50)     # maybe instead / in addition change tk.sunken to tk.groove
             elif self.parent.active_cell in [(self.row-1,self.col), (self.row+1,self.col), (self.row,self.col-1), (self.row,self.col+1)]:
                 bg = self.parent.parent.gui.adjust_color_brightness(bg, -50)     # maybe instead / in addition change tk.sunken to tk.groove
-                # relief = tk.GROOVE
-
 
             return text, bg, fg, self.image

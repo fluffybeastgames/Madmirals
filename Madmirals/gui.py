@@ -93,15 +93,12 @@ class MadmiralsGUI:
         self.root.bind('<Control-q>', self.quit_game)
         self.root.bind('<Control-n>', self.open_game_settings)          # WARNING this will be reversed if caps lock is on.. look into 
         self.root.bind('<Control-N>', self.quick_game)                    # bind_caps_lock = e1.bind('<Lock-KeyPress>', caps_lock_on)  
-        # self.root.bind('<Control-M>', self.open_game_settings)
-        # self.root.bind('<Control-m>', self.open_game_settings)
         self.root.bind('<Control-F>', self.toggle_fog_of_war)
         self.root.bind('<Control-f>', self.toggle_fog_of_war)
         self.root.bind('<Control-D>', self.toggle_debug_mode)
         self.root.bind('<Control-d>', self.toggle_debug_mode)
         self.root.bind('<Control-O>', self.open_replay_window)
         self.root.bind('<Control-o>', self.open_replay_window)
-        
         
     def zoom_wheel_handler(self, event):
         # event.num for Linux, event.delta for Windows
@@ -144,15 +141,14 @@ class MadmiralsGUI:
         self.frame_controls.btn_action_normal.config(state='disabled', relief='sunken')
         self.frame_controls.btn_action_move_all.config(state='normal', relief='raised')
         self.frame_controls.btn_action_move_half.config(state='normal', relief='raised')
-        self.parent.game.players[PLAYER_ID].commando_mode = False
+        self.parent.game.players[PLAYER_ID].move_all_mode = False
         self.parent.game.players[PLAYER_ID].right_click_pending_address = None
 
-    
     def btn_action_move_all(self): # The equivalent of middle clicking on active cell
         self.frame_controls.btn_action_normal.config(state='normal', relief='raised')
         self.frame_controls.btn_action_move_all.config(state='disabled', relief='sunken')
         self.frame_controls.btn_action_move_half.config(state='normal', relief='raised')    
-        self.parent.game.players[PLAYER_ID].commando_mode = True
+        self.parent.game.players[PLAYER_ID].move_all_mode = True
         self.parent.game.players[PLAYER_ID].right_click_pending_address = None    
 
     def btn_action_move_half(self): # The equivalent of right clicking on active cell
@@ -161,13 +157,12 @@ class MadmiralsGUI:
         self.frame_controls.btn_action_move_half.config(state='disabled', relief='sunken')        
         self.parent.game.players[PLAYER_ID].right_click_pending_address = self.parent.game.active_cell
 
-
     def cell_left_clicked(self, address, event): # Handler for a game cell being left clicked
         self.parent.game.move_active_cell(new_address=address)
             
     def cell_middle_clicked(self, address, event): # Handler for a game cell being middle clicked
         # if we are middle clicking on the already active cell, toggle retreat mode
-        if self.parent.game.active_cell == address and self.parent.game.players[PLAYER_ID].commando_mode:
+        if self.parent.game.active_cell == address and self.parent.game.players[PLAYER_ID].move_all_mode:
             self.btn_action_normal()
         else: # Otherwise activate/keep mode in commando mode, and cancel any pending right clicks
             self.btn_action_move_all()
@@ -175,10 +170,11 @@ class MadmiralsGUI:
         self.parent.game.active_cell = address
         
     def cell_right_clicked(self, address, event): # Handler for a game cell being right clicked
-        #print('right click = activate "move half" mode for next action')
+    # Right clicking sets a flag on a cell indicating that it should be moved 
+
         self.parent.game.active_cell = address
         
-        self.parent.game.players[PLAYER_ID].commando_mode = False
+        self.parent.game.players[PLAYER_ID].move_all_mode = False
         self.parent.game.players[PLAYER_ID].right_click_pending_address = address
     
     def key_press_handler(self, event):
@@ -230,12 +226,12 @@ class MadmiralsGUI:
                     action = ACTION_MOVE_HALF
                     
                     # after moving half, revert to either normal or 'commando' mode
-                    if self.parent.game.players[PLAYER_ID].commando_mode: 
+                    if self.parent.game.players[PLAYER_ID].move_all_mode: 
                         self.btn_action_move_all() 
                     else:
                         self.btn_action_normal() # after moving half, revert to either normal or 'commando' mode
                 
-                elif self.parent.game.players[PLAYER_ID].commando_mode:
+                elif self.parent.game.players[PLAYER_ID].move_all_mode:
                     action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/ships
                 else:
                     action = ACTION_MOVE_NORMAL

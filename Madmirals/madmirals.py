@@ -35,11 +35,12 @@ class MadmiralsGameManager:
 
     
 
-    def create_new_replay_game(self, game_id):
+    def create_new_replay_game(self, game_id, debug=True):
         print('create_new_replay_game')
 
         sql = f'SELECT game_id, seed, num_rows, num_cols, num_players FROM log_games WHERE game_id={game_id}'
         game_info = self.db.run_sql_select(sql)
+        self.debug_mode = debug
       
         self.game = MadmiralsGameInstance(self, game_id=game_info[0][0], seed=game_info[0][1], num_rows=game_info[0][2], num_cols=game_info[0][3], num_players=game_info[0][4], game_mode=GAME_MODE_REPLAY)
         
@@ -58,9 +59,10 @@ class MadmiralsGameManager:
         self.game_loop() # start the game cycle!
 
 
-    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None, player_name=None, fog=True):
+    def create_new_game(self, num_rows=None, num_cols=None, num_players=None, seed=None, game_mode=None, game_id=None, player_color=None, player_name=None, fog=True, debug=False):
         print('create_new_game')
-
+        
+        self.debug_mode = debug
         self.game = MadmiralsGameInstance(self, seed=seed, num_rows=num_rows, num_cols=num_cols, game_mode=game_mode, num_players=num_players, player_color=player_color, player_name=player_name, fog=fog)
         
         self.gui.prep_new_game()
