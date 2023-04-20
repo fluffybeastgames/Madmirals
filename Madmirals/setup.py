@@ -39,43 +39,23 @@ default_bot_names = [
     ('Commodore Limpy',) 
 ]
 
-default_colors = [ # color name, hex, and rgb
-    ('Black', '#0C0C0C',    	'(12, 12, 12)'),
-    ('Red', '#C50F1F',  	    '(197, 15, 31)'),
-    ('Green', '#13A10E',    	'(19, 161, 14)'),
-    ('Yellow', '#C19C00',   	'(193, 156, 0)'),
-    ('Blue', '#0037DA',     	'(0, 55, 218)'),
-    ('Magenta', '#881798',  	'(136, 23, 152)'),
-    ('cyan', '#3A96DD',     	'(58, 150, 221)'),
-    ('white', '#CCCCCC',    	'(204, 204, 204)'),
-    ('Grey', '#767676',     	'(118, 118, 118)'),
-    ('Bright Red', '#E74856',   '(231, 72, 86)'),
-    ('Bright Green', '#16C60C',  '(22, 198, 12)'),
-    ('Bright Yellow', '#F9F1A5','(249, 241, 165)'),
-    ('Bright blue', '#3B78FF',  '(59, 120, 255)'),
-    ('Bright Magenta', '#B4009E','(180, 0, 158)'),
-    ('Bright Cyan', '#61D6D6',  '(97, 214, 214)'),
-    ('Bright white', '#F2F2F2', '(242, 242, 242)')
-]
-
-default_colors_old = [
-    ('dark red', 'white', 'dark red'),
-    ('light green', 'black', 'light green'),
-    ('crimson', 'white', 'crimson',),
-    ('violet', 'black', 'violet',),
-    ('orange', 'black', 'orange',),
-    ('yellow', 'black', 'yellow',),
-    ('dark orange', 'white', 'dark orange'),
-    ('purple', 'white', 'purple',),
-    ('dark blue', 'white', 'dark blue'),
-    ('white', 'black', 'black on white'),
-    ('white', 'orange', 'orange on white'),
-    ('white', 'dark grey', 'dark grey on white'),
-    ('white', 'dark blue', 'dark blue on white'),
-    ('white', 'crimson', 'crimson on white'),
-    ('white', 'teal', 'teal on white'),
-    ('white', 'purple', 'purple on white')
-       
+default_colors = [ # color name, hex, rgb, and boolean color_preference - lower preference numbers will always be used before higher ones
+    ('Red', '#C50F1F',  	    '(197, 15, 31)', 1),
+    ('Dark Green', '#0a5a07',   '(10, 90, 7)', 1),
+    ('Yellow', '#C19C00',   	'(193, 156, 0)', 1),
+    ('Magenta', '#881798',  	'(136, 23, 152)', 1),
+    ('white', '#CCCCCC',    	'(204, 204, 204)', 12),
+    ('Grey', '#767676',     	'(118, 118, 118)', 10),
+    ('Bright Red', '#E74856',   '(231, 72, 86)', 1),
+    ('Bright Green', '#16C60C',  '(22, 198, 12)', 2),
+    ('Bright Yellow', '#F9F1A5','(249, 241, 165)', 3),
+    ('Bright Magenta', '#B4009E','(180, 0, 158)', 1),
+    ('Bright Cyan', '#61D6D6',  '(97, 214, 214)', 12),
+    ('Bright white', '#F2F2F2', '(242, 242, 242)', 12),
+    ('Black', '#0C0C0C',    	'(12, 12, 12)', 9),
+    ('cyan', '#3A96DD',     	'(58, 150, 221)', 14),
+    ('Bright blue', '#3B78FF',  '(59, 120, 255)', 14),
+    ('Blue', '#0037DA',     	'(0, 55, 218)', 14), 
 ]
 
 def setup_game_env():

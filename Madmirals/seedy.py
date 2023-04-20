@@ -1,8 +1,10 @@
 import opensimplex
 import numpy as np
-
+import random 
 ### Project modules
 from constants import *
+from db import MadDBConnection
+
 
 class Seedling:
     
@@ -31,6 +33,21 @@ class Seedling:
 
         return opensimplex.noise3array(rng_z, rng_y, rng_x)
     
+    def get_player_colors(parent, seed, num_players):
+        sql_colors = f'SELECT hex FROM colors ORDER BY color_priority, hex LIMIT {min(num_players, 8)} '
+        list_colors = parent.parent.db.run_sql_select(sql_colors, num_vals_selected=1)
+        random.seed(seed) # by setting the random seed to our seed, we can be sure we'll always recreate the same colors
+        random.shuffle(list_colors)
+        return list_colors[:num_players+1]
+
+    def get_bot_names(parent, seed, num_players):
+        sql_names = 'SELECT bot_name FROM bot_names ORDER BY bot_name'
+        list_avail_names = parent.parent.db.run_sql_select(sql_names, num_vals_selected=1)
+        random.seed(seed) # by setting the random seed to our seed, we can be sure we'll always recreate the same colors
+        random.shuffle(list_avail_names)
+
+        return list_avail_names[:num_players+1]
+        
     def __init__(self, seed):
         self.name = 'Seedling'
 

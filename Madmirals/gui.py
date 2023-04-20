@@ -126,8 +126,8 @@ class MadmiralsGUI:
             num_rows = self.parent.game.num_rows
             num_cols = self.parent.game.num_cols
             num_players = self.parent.game.num_players
-            player_color = self.parent.game.player_color
-            # player_color= self.parent.game.players[0].color_bg
+            #player_color = self.parent.game.player_color
+            player_color = None
             seed = None
             game_mode = GAME_MODE_FFA
 
@@ -164,7 +164,7 @@ class MadmiralsGUI:
         # if we are middle clicking on the already active cell, toggle retreat mode
         if self.parent.game.active_cell == address and self.parent.game.players[PLAYER_ID].move_all_mode:
             self.btn_action_normal()
-        else: # Otherwise activate/keep mode in commando mode, and cancel any pending right clicks
+        else: # Otherwise activate/keep mode in move all mode, and cancel any pending right clicks
             self.btn_action_move_all()
 
         self.parent.game.active_cell = address
@@ -225,11 +225,11 @@ class MadmiralsGUI:
                 if self.parent.game.players[PLAYER_ID].right_click_pending_address == active_cell_address:
                     action = ACTION_MOVE_HALF
                     
-                    # after moving half, revert to either normal or 'commando' mode
+                    # after moving half, revert to either normal or 'move all' mode
                     if self.parent.game.players[PLAYER_ID].move_all_mode: 
                         self.btn_action_move_all() 
                     else:
-                        self.btn_action_normal() # after moving half, revert to either normal or 'commando' mode
+                        self.btn_action_normal() # after moving half, revert to either normal or 'move all' mode
                 
                 elif self.parent.game.players[PLAYER_ID].move_all_mode:
                     action = ACTION_MOVE_ALL # downstread we will override this when crossing admirals/ships
@@ -386,8 +386,9 @@ class MadmiralsGUI:
             self.top.grab_set()
 
         def assign_initial_vals(self):
-            seed = random.randint(0, 10**10)
-            self.frame_game.new_seed.set(seed) # a random seed, same range as default 'New Game'
+            seed = self.generate_new_seed()
+            # seed = random.randint(0, 10**10)
+            # self.frame_game.new_seed.set(seed) # a random seed, same range as default 'New Game'
             
             self.frame_params.val_rows.set(Seedling.get_num_rows(seed))
             self.frame_params.val_cols.set(Seedling.get_num_cols(seed))
@@ -462,6 +463,10 @@ class MadmiralsGUI:
             if self.frame_params.rows_rand_or_cust.get() == USE_DEFAULT: self.frame_params.val_rows.set(Seedling.get_num_rows(new_seed))
             if self.frame_params.cols_rand_or_cust.get() == USE_DEFAULT: self.frame_params.val_cols.set(Seedling.get_num_cols(new_seed))
             if self.frame_params.bots_rand_or_cust.get() == USE_DEFAULT: self.frame_params.val_bots.set(Seedling.get_num_players(new_seed) - 1) # because the prompt is # enemies, not # players
+        
+            self.reset_user_color(new_seed)
+
+            return new_seed
                 
         def pop_sett_frame_player(self):
             f = self.frame_player # convenience variable
@@ -476,23 +481,39 @@ class MadmiralsGUI:
             self.player_color_bg = tk.StringVar()
             self.player_color_fg = tk.StringVar()
             
-            bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
-            fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
-            self.player_color_bg.set(bg)
-            self.player_color_fg.set(fg)            
-   
+            # #seed = self.frame_game.new_seed.get()
+            # #bg = Seedling.get_player_colors(self, seed, Seedling.get_num_players(seed))[0]
+            # print(f'new seed {self.frame_game.new_seed.get()}')
+            # print(f'num playersdasfdsaf {Seedling.get_num_players(111)}')
+            # bg = "#000000"
+            # # bg = self.parent.parent.game.players[0].color_bg
+            
+            # #bg = Seedling.get_player_color(new_seed, 0)
+            # fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
+            
+            # self.player_color_bg.set(bg) 
+            # self.player_color_fg.set(fg)
+            
+            # # bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
+            # # fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
+            # self.player_color_bg.set(bg)
+            # self.player_color_fg.set(fg)        
+
+            bg = 'light grey'
+            fg = 'black' 
+                
             lbl_player = tk.Label(f, text='Player', font=('Arial 10 bold'))
             self.player_name_entry = tk.Entry(f, textvariable=self.player_name, width=20, bg=bg, fg=fg, font=('Arial 14 bold'))
     
             # btn_generate_new_user = tk.Button(master=self.top, text='Register', width=14, height=1, highlightcolor='orange', command=generate_new_user, bg='light blue')
             btn_player_color = tk.Button(f, text='Select Color', width=14, height=1, bg='light blue', command=self.prompt_for_user_color)
             #btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
-            btn_reset_color = tk.Button(f, text='Random Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
+            # btn_reset_color = tk.Button(f, text='Reset Color', width=14, height=1, bg='light blue', command=self.reset_user_color)
             
             lbl_player.grid(row=0,column=0, padx=10, pady=(5,2), sticky='w')
             self.player_name_entry.grid(row=1,column=0, columnspan=2, padx=10, pady=(2,2), sticky='w')
             btn_player_color.grid(row=2, column=0, padx=10, pady=(2,2))
-            btn_reset_color.grid(row=2, column=1, padx=10, pady=(2,2))
+            # btn_reset_color.grid(row=2, column=1, padx=10, pady=(2,2))
 
         def prompt_for_user_color(self):
             # Bring up a color picker window. If the user picks a color, check whether fg should be black or white
@@ -508,9 +529,19 @@ class MadmiralsGUI:
 
                 self.player_name_entry.config(bg=bg, fg=fg) #TODO HERE MOVE THIS ENTRY TO settingdwindow
 
-        def reset_user_color(self):
-            bg = "#"+''.join([random.choice('0123456789ABCDEF') for i in range(6)])
+        def reset_user_color(self, seed=None):
+            
+            print(seed)
+            num_players = Seedling.get_num_players(seed)
+            bg = Seedling.get_player_colors(self.parent, seed, num_players)[0]
+
+            # print(bg)
             fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
+                
+            self.player_color_bg.set(bg) 
+            self.player_color_fg.set(fg)
+
+            #fg = '#FFFFFF' if self.parent.is_color_dark(bg) else '#000000'
             
             self.player_color_bg.set(bg) # we will grab this value on apply settings
             self.player_color_fg.set(fg)
@@ -812,7 +843,7 @@ class MadmiralsGUI:
         
         tk.Label(master=self.frame_debug, text='Debug', font=('Arial 22 bold')).grid(row=0, column=0, sticky='W', padx=10)
         tk.Label(master=self.frame_debug, text='Frames', font=('Arial 12')).grid(row=1, column=0, sticky='E', padx=10)
-        tk.Label(master=self.frame_debug, text='Time (s)', font=('Arial 12')).grid(row=1, column=1, sticky='E', padx=10)
+        tk.Label(master=self.frame_debug, text='Elapsed (s)', font=('Arial 12')).grid(row=1, column=1, sticky='E', padx=10)
         tk.Label(master=self.frame_debug, text='FPS', font=('Arial 12')).grid(row=1, column=2, sticky='E', padx=10)
         tk.Label(master=self.frame_debug, text='Game Status', font=('Arial 12')).grid(row=1, column=3, sticky='W', padx=10)
         tk.Label(master=self.frame_debug, text='Seed', font=('Arial 12')).grid(row=1, column=4, sticky='W', padx=10)
@@ -993,8 +1024,7 @@ class MadmiralsGUI:
                 str_bot_personality = str_bot_personality + f'\n{get_personality_name(p.bot_personality)}'
                 str_bot_last_behavior = str_bot_last_behavior + f'\n{get_behavior_name(p.bot_last_behavior)}'
                 str_bot_troops = str_bot_troops + f'\n{p.troops}'
-                
-                
+                                
         self.frame_debug.lbl_frames.config(text=frames)
         self.frame_debug.lbl_time.config(text=elapsed)        
         self.frame_debug.lbl_fps.config(text=fps)

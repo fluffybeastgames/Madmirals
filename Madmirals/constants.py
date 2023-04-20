@@ -94,6 +94,8 @@ DEFAULT_LABEL_SIZE = 55
 
 MAGIC_NUM_TO_FIX_CELL_SIZE = 0 # tk.Button seems to add 5 px to the height and width 
 
+NUM_DEFAULT_COLORS = 8 # how many bot colors are listed as preferred
+
 ROW_FRAME_WIN_CONDS = 2 #????
 
 ### Game Settings window / Seedy

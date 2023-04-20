@@ -10,12 +10,11 @@ import tkinter as tk  # TODO is that one remaining Stringvar() necessary?
 
 ### Project modules
 from constants import *
-from db import MadDBConnection
+# from db import MadDBConnection
 from seedy import Seedling # 
 from path_finder import *
 
 class MadmiralsGameInstance:
-    
     def __init__(self, parent, seed=None, num_rows=None, num_cols=None, game_mode=None, num_players=None, game_id=None, player_color=None, player_name=None, starting_troops=100, fog=True):
         self.parent = parent
         
@@ -99,10 +98,9 @@ class MadmiralsGameInstance:
 
             print(f'Num players: {self.num_players}')
 
-        sql_names = 'SELECT bot_name FROM bot_names ORDER BY bot_name'
-        sql_colors = 'SELECT hex FROM colors ORDER BY hex'
-        list_avail_names = self.parent.db.run_sql_select(sql_names, num_vals_selected=1)
-        list_avail_colors = self.parent.db.run_sql_select(sql_colors, num_vals_selected=1)
+        list_bot_names  = Seedling.get_bot_names(self, self.seed, self.num_players)
+        list_player_colors = Seedling.get_player_colors(self, self.seed, self.num_players)
+        
         bot_personalities = [
             BOT_PERSONALITY_MIX_IT_UP,
             BOT_PERSONALITY_GROW_GATHER_SAIL_COMBINE,
@@ -126,11 +124,9 @@ class MadmiralsGameInstance:
         for i in range(self.num_players):
             player_id = i
             
-            user_desc = list_avail_names.pop(self.seed*123 % len(list_avail_names))
-            user_colors = list_avail_colors.pop(self.seed*33 % len(list_avail_colors))
-            
-            bg = user_colors
-            # print(bg)
+            # user_desc = list_avail_names.pop(self.seed*123 % len(list_avail_names))
+            user_desc = list_bot_names[i]
+            bg = list_player_colors[i]
             fg = '#FFFFFF' if self.parent.gui.is_color_dark(bg) else '#000000'
 
             if player_id == PLAYER_ID:
@@ -618,10 +614,11 @@ class MadmiralsGameInstance:
                 return BOT_BEHAVIOR_ATTACK_SHIP
             
         elif pers == BOT_PERSONALITY_MIX_IT_UP:
-            if self.turn % 25 == 1:
+            if self.turn % 15 == 1:
                 return random.choice((BOT_BEHAVIOR_PETRI, BOT_BEHAVIOR_TRACKER, BOT_BEHAVIOR_GROW, BOT_BEHAVIOR_GATHER, BOT_BEHAVIOR_COMBINE_SHIPS, BOT_BEHAVIOR_SAIL_AROUND))
             else: 
                 return self.players[bot_num].bot_last_behavior 
+            # return random.choice((BOT_BEHAVIOR_PETRI, BOT_BEHAVIOR_TRACKER, BOT_BEHAVIOR_GROW, BOT_BEHAVIOR_GATHER, BOT_BEHAVIOR_COMBINE_SHIPS, BOT_BEHAVIOR_SAIL_AROUND))
 
 
     def bot_turn(self, bot_num):
@@ -897,7 +894,7 @@ class MadmiralsGameInstance:
             self.bot_last_behavior = None # most recent behavior the bot has performed 
 
             self.right_click_pending_address = None # if the player right clicked on a cell, be ready to move half of troops instead of all
-            self.commando_mode = False # if true, attempt to move ALL troops instead of all but one
+            self.move_all_mode = False # if true, attempt to move ALL troops instead of all but one
         
         def update_player_stats(self):
             num_land = 0
