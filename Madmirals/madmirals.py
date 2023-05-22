@@ -1,6 +1,7 @@
 # ### MADMIRALS!!!
 import time
 import sqlite3
+from pathlib import Path
 
 ### Project modules
 from constants import *
@@ -16,7 +17,8 @@ class MadmiralsGameManager:
     CYCLE_SPEED = 20 # ms between checks of game loop
 
     def __init__(self):
-        self.db = MadDBConnection('..\data\mad_dev_test.db')
+        db_path = Path(__file__).parent.parent / 'data' / 'u_1.db'
+        self.db = MadDBConnection(db_path)
         # self.con = sqlite3.connect()
         # self.cur = self.con.cursor()
         self.images = ImageData()

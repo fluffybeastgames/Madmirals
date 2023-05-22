@@ -1,5 +1,4 @@
-import os.path
-from os import path
+from pathlib import Path
 
 ### Project modules
 from db import MadDBConnection
@@ -59,13 +58,12 @@ default_colors = [ # color name, hex, rgb, and boolean color_preference - lower 
 ]
 
 def setup_game_env():
-    if not os.path.exists('..\\data\\'):
-        print('Creating data directory')
-        os.makedirs('..\\data\\')
+    data_dir = Path('../data/')
+    data_dir.mkdir(exist_ok=True, parents=True)
 
     uid = 1
-    db_path = f'..\\data\\u_{uid}.db'
-    if os.path.exists(db_path):
+    db_path = data_dir / f'u_{uid}.db'
+    if db_path.exists():
         print(f'CANNOT CREATE - profile already exists for UID {uid}')
     
     else:
@@ -84,4 +82,3 @@ def setup_game_env():
 if __name__ == '__main__':
     
     setup_game_env()
-    
