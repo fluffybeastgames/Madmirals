@@ -34,7 +34,8 @@ class Seedling:
         return opensimplex.noise3array(rng_z, rng_y, rng_x)
     
     def get_player_colors(parent, seed, num_players):
-        sql_colors = f'SELECT hex FROM colors ORDER BY color_priority'
+        num_colors = 8 if num_players <= 8 else num_players
+        sql_colors = f'SELECT hex FROM colors ORDER BY color_priority, hex LIMIT {num_colors} '
         list_colors = parent.parent.db.run_sql_select(sql_colors, num_vals_selected=1)
         random.seed(seed) # by setting the random seed to our seed, we can be sure we'll always recreate the same colors
         random.shuffle(list_colors)
