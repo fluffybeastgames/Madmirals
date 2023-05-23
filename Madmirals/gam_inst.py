@@ -54,6 +54,8 @@ class MadmiralsGameInstance:
         self.replay_pos = 0 # IFF game_mode = replay, use this row to iterate through records
         
         self.generate_game_world(starting_admiral_troops=starting_troops)
+        ####self.generate_game_world_test(starting_admiral_troops=starting_troops) #TODO
+        
 
         if self.game_mode == GAME_MODE_REPLAY:
             sql = f'SELECT turn_num, row, col, terrain_type, entity_type, player_id, troops FROM log_game_moves WHERE game_id={self.game_id} ORDER BY turn_num, row, col'
@@ -89,6 +91,12 @@ class MadmiralsGameInstance:
 
         return closest_entity_address, closest_entity_distance # will return None if no entities found on map
 
+    def generate_game_world_test(self, starting_admiral_troops):
+        print(f'Generating test world with seed {self.seed}')
+        self.num_players = 2
+        
+
+
 
     def generate_game_world(self, starting_admiral_troops):
         print(f'Generating world with seed {self.seed}')
@@ -119,13 +127,15 @@ class MadmiralsGameInstance:
             BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK,
             BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK,
             BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK
-        ]
+        ] 
 
         for i in range(self.num_players):
             player_id = i
             
             # user_desc = list_avail_names.pop(self.seed*123 % len(list_avail_names))
             user_desc = list_bot_names[i]
+
+            print(f'num players {self.num_players} player_id {i} len list_colors {len(list_player_colors)}')
             bg = list_player_colors[i]
             fg = '#FFFFFF' if self.parent.gui.is_color_dark(bg) else '#000000'
 
@@ -620,6 +630,8 @@ class MadmiralsGameInstance:
                 return self.players[bot_num].bot_last_behavior 
             # return random.choice((BOT_BEHAVIOR_PETRI, BOT_BEHAVIOR_TRACKER, BOT_BEHAVIOR_GROW, BOT_BEHAVIOR_GATHER, BOT_BEHAVIOR_COMBINE_SHIPS, BOT_BEHAVIOR_SAIL_AROUND))
 
+        elif pers == BOT_SMARTY_PANTS:
+            print('so smart I do nothing')
 
     def bot_turn(self, bot_num):
         behavior =  self.get_bot_behavior(bot_num)
@@ -715,8 +727,33 @@ class MadmiralsGameInstance:
                         if self.game_board[(i,j)].troops < 0:
                             self.game_board[(i,j)].owner = None
                             self.game_board[(i,j)].troops = 0
-                            self.game_board[(i,j)].changed_this_turn = True                            
-                                
+                            self.game_board[(i,j)].changed_this_turn = True  
+
+
+            ### Powerup check                          
+            if self.turn % 50 == 0: # add pups
+                num_pups_added = 0
+                num_pups_to_add = 3
+                
+                random.seed(self.seed + self.turn) # makes the entire function pseudorandom - give the same board state and turn number, this will produce the same pups/amounts in the same cells
+                row_order = list(range(self.num_rows))
+                col_order = list(range(self.num_cols))
+                random.shuffle(row_order) # Shuffle the order to improve the randomness of results 
+                random.shuffle(col_order) # - otherwise there would be noticeable waves pf top left to bottom right moves
+                
+                for i in row_order:
+                    for j in col_order:
+                        if num_pups_added < num_pups_to_add:
+                            if self.game_board[(i,j)].troops == 0: 
+                                self.game_board[(i,j)].troops = random.randrange(-25, -5)
+                                num_pups_added += 1
+
+            elif self.turn % 25 == 0: # remove pups
+                for i in range(self.num_rows):
+                    for j in range(self.num_cols):
+                        if self.game_board[(i,j)].troops < 0: self.game_board[(i,j)].troops = 0 # for now, only pup is enticements onto empty land
+                        # terrain_type = self.game_board[(i,j)].terrain_type
+                        # entity_type = self.game_board[(i,j)].entity_type                                
             
         # # refresh which cells should be viewable to the user # TODO make an array of these values, one for each player, that way AI has some limitations re trying to walk thru mtns
         # for i in range(self.num_rows):

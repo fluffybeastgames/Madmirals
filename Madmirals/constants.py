@@ -63,7 +63,7 @@ BOT_PERSONALITY_GROW_PETRI_GATHER_TRACK = 107
 BOT_PERSONALITY_GROW_GATHER_SAIL_COMBINE = 108
 BOT_PERSONALITY_GROW_GATHER_SAIL_ATTACK = 109
 BOT_PERSONALITY_MIX_IT_UP = 110
-
+BOT_SMARTY_PANTS = 111
 
 # Currently the bot's entire personality, but different behavior checks for the same bot should be built later on
 BOT_BEHAVIOR_PETRI = 1 # Analyzes current board state and comes up with a weighted list of suggested moves; a weighted sort picks one. Chaotic and shortsighted, but not totally stupid.
@@ -170,6 +170,8 @@ def get_personality_name(num):
     elif num == BOT_PERSONALITY_GROW_GATHER_SAIL_COMBINE: return 'Sailor'
     elif num == BOT_PERSONALITY_GROW_GATHER_SAIL_ATTACK: return 'Seaman'
     elif num == BOT_PERSONALITY_MIX_IT_UP: return 'Sir Mix Up'
+    elif num == BOT_SMARTY_PANTS: return 'Smarty Pants'
+
     else: raise ValueError('Invalid personality matrix detected')
 
 def get_behavior_name(num):
